@@ -1,0 +1,2 @@
+export type FileNames = 'FileNames'
+

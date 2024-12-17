@@ -1,0 +1,40 @@
+* {
+  box-sizing: content-box;
+}
+
+.__modal-parent * {
+  overscroll-behavior: none;
+  box-sizing: border-box;
+}
+
+.__modal-parent {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  width: 100%;
+  height: 100vh;
+  overscroll-behavior: none;
+  overflow: auto;
+}
+
+.__hidden {
+  display: none;
+}
+
+.__block {
+  display: block;
+}
+
+.__modal {
+  position: absolute;
+  inset: 0;
+}
+
+.__inactive {
+  pointer-events: none;
+  z-index: 0;
+}
+
+.__active {
+  z-index: 501;
+}
