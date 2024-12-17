@@ -5,7 +5,7 @@ Modal-X
 ## Installation
 
 ```sh
-$ npm install @customizer/modal-x
+npm install @customizer/modal-x
 ```
 
 ## Usage
@@ -72,8 +72,12 @@ function confirmToDelete() {
 ```
 :tada: congratulation that's all there is to it
 
-> **Note:** Most of the time when I use **Modal-X** I forget the exact names of the files. So, I have a small script that I wrote to help with the autocomplete of the file names. To use it, run: `npx watchmodal`. This will scan your project for modal files and assist with writing the file names when opening the modals.
-![Autocomplete File Names](/public/filenames_autocomplete.png)
+> **Note:** Most of the time when I use **Modal-X** I forget the exact names of the files. So, I have a small script that I wrote to help with the autocomplete of the file names. To use it, run: 
+```sh 
+npx watchmodal 
+```
+> This will scan your project for modal files and assist with writing the file names when opening the modals.
+![Autocomplete File Names](https://i.ibb.co/8rH12rC/filenames-autocomplete.png)
 
 ## Types Of Modals (`*.mdl.vue` and `*.amdl.vue`)
 ### `*.mdl.vue` files

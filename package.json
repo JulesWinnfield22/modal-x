@@ -1,6 +1,6 @@
 {
   "name": "@customizer/modal-x",
-  "version": "0.0.83",
+  "version": "0.0.86",
   "private": false,
   "bin": {
     "watchmodal": "./generateFileNames.cjs"
@@ -19,6 +19,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:unit": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JulesWinnfield22/modal-x.git"
   },
   "dependencies": {
     "pinia": "^2.1.6",
