@@ -108,7 +108,7 @@ npx watchmodal
 This type of modal files are loaded with the rest of the project and stored in a `pinia` store 
 
 ### `*.amdl.vue` files
-this types of modal files are not loaded with the rest of the project. they are loaded lazyly, only when needed or when `openModal` is called.
+this types of modal files are not loaded with the rest of the project. they are loaded lazily, only when needed or when `openModal` is called.
 
 when using a `*.amdl.vue` file you will see a loading component that shows a spinner untill the component is loaded.
 
