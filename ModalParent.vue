@@ -25,7 +25,7 @@ watch(
 );
 
 function escListener(e) {
-  if (e.key === "Escape" && modals?.length && options.value[name].autoClose) {
+  if (e.key === "Escape" && modals?.length && options.value?.[name]?.autoClose) {
     closeModal();
   }
 }

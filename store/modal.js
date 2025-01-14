@@ -12,8 +12,6 @@ import ModalParent from '../ModalParent.vue'
 import { defineStore } from "pinia";
 import Spinner from "../Spinner.vue";
 
-const onShowHooks = [];
-const onHideHooks = [];
 const options = ref({});
 
 function modalOptions(option) {
@@ -34,48 +32,8 @@ function modalOptions(option) {
   })
 }
 
-function onShow(cb) {
-  if (typeof cb != "function") {
-    console.warn(
-      "function %[onShow] expects a function as the first arguments",
-      "color: red"
-    );
-  }
 
-  const fileName = getCurrentInstance()?.type?.__name?.split(".")?.[0];
-  if (onShowHooks.find((el) => el.name == fileName)) return;
-  onShowHooks.push({
-    name: fileName,
-    hook: cb,
-    called: false,
-  });
-}
-
-function onHide(cb) {
-  if (typeof cb != "function") {
-    console.warn(
-      "function %[onHide] expects a function as the first arguments",
-      "color: red"
-    );
-  }
-
-  const fileName = getCurrentInstance()?.type?.__name?.split(".")?.[0];
-  if (onHideHooks.find((el) => el.name == fileName)) return;
-  onHideHooks.push({
-    name: fileName,
-    hook: cb,
-  });
-}
-
-function callHook(hook) {
-  if (hook && typeof hook == "function") {
-    hook();
-  } else if (hook) {
-    console.error("Hook functions first argument not a function");
-  }
-}
-
-export { onShow, onHide, modalOptions, options };
+export { modalOptions, options };
 
 export const useModal = defineStore("modal", () => {
   let modals = reactive([]);
@@ -97,13 +55,6 @@ export const useModal = defineStore("modal", () => {
   }
 
   function closeModal(response, sendResponse = true) {
-    let modal = modals[0];
-    const found = onHideHooks.find((el) => el.name == modal?.modalToOpen);
-    callHook(found?.hook);
-    if (modals.length == 1) {
-      const found = onShowHooks.find((el) => el.name == modal?.modalToOpen);
-      found && (found.called = false);
-    }
     modals.shift();
     modals.length && (modals[0].active = true);
 
@@ -133,6 +84,7 @@ export const useModal = defineStore("modal", () => {
       {
         id: name || "",
         modal: h(ModalParent, {
+          ...options.value,
           name
         }, () => {
           return h(com, {
@@ -218,34 +170,7 @@ export const useModal = defineStore("modal", () => {
     if (modals?.[0]) fetchModal(modals?.[0]?.modalToOpen);
   });
 
-  watch(
-    modals,
-    (newModals, oldModals) => {
-      if (!newModals.length) return;
-      const name = modals?.[0]?.modalToOpen;
-      const found = onShowHooks.find((el) => el.name == name);
-      found && !found.called && callHook(found?.hook);
-    },
-    {
-      flush: "post",
-    }
-  );
-
-  watch(
-    modals,
-    (newModals, oldModals) => {
-      if (!newModals.length) return;
-      const name = modals?.[1]?.modalToOpen;
-      const found = onShowHooks.find((el) => el.name == name);
-      found && (found.called = true);
-    },
-    {
-      flush: "post",
-    }
-  );
-
   return {
-    onShow,
     modals,
     loadSpinners,
     spinners,

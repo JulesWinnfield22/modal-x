@@ -1,6 +1,6 @@
 {
   "name": "@customizer/modal-x",
-  "version": "0.0.86",
+  "version": "0.0.88",
   "private": false,
   "bin": {
     "watchmodal": "./generateFileNames.cjs"

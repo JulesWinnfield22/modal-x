@@ -161,13 +161,6 @@ onUnmounted(() => {
   document.removeEventListener("keydown", tabListener);
 });
 
-function scrollHandler(ev) {
-  console.log(ev, showModal.value);
-  ev.preventDefault();
-  if (showModal.value) {
-  }
-}
-
 let scroll = getComputedStyle(document.body)?.overflow;
 
 watch(showModal, () => {

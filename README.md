@@ -26,9 +26,32 @@ app.use(modal)
 app.mount('#app')
 ```
 
+when using with `NUXT` do this:
+
+in you `plugins` folder create a file `modalx-plugin.ts` or any name you like
+
+in your `plugins/modalx-plugin.ts` file
+
+```js
+import modal from '@customizer/modal-x'
+
+export default defineNuxtPlugin(nuxtApp => {
+  nuxtApp.vueApp.use(modal)
+})
+```
+
+and in your `nuxt.config.ts` file
+```js
+plugins: [
+  ...
+  // only on the client
+  { src: '~/plugins/modalx-plugin', mode: 'client' }, 
+  ...
+]
+```
 **with that you are ready to start using it.**
 
-then create a modal file anywhere inside the `./src` folder. lets say inside the components folder `src/components/Confirmation.mdl.vue`
+then create a modal file anywhere inside the `./src` folder. lets say inside the components folder `./src/components/Confirmation.mdl.vue`
 ```html
 // src/componetns/Confirmation.mdl.vue
 <script setup>
@@ -77,6 +100,7 @@ function confirmToDelete() {
 npx watchmodal 
 ```
 > This will scan your project for modal files and assist with writing the file names when opening the modals.
+
 ![Autocomplete File Names](https://i.ibb.co/8rH12rC/filenames-autocomplete.png)
 
 ## Types Of Modals (`*.mdl.vue` and `*.amdl.vue`)
@@ -143,3 +167,6 @@ you can pass data to a modal using the `openModal` function and the modal will g
 ```
 
 and when ever you call `closeModal` and pass any data to it the component/function that opened the modal will get that data back from the opened modal.
+
+## APIS
+LOADING ...

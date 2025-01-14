@@ -3,7 +3,7 @@
 const { readdir, stat, writeFileSync, watch } = require("fs");
 const { join } = require("path");
 
-const directoryPath = join(__dirname, "../../../src");
+const directoryPath = join(__dirname, "../../../");
 const outputPath = join(__dirname, "FileNameEnums.ts");
 
 let enumEntries = [];
@@ -13,11 +13,10 @@ function createFileNames() {
 
   const enumContent = `export type FileNames = ${names}`;
 
-  writeFileSync(outputPath, enumContent)
+  writeFileSync(outputPath, enumContent);
 }
 
 const generateEnum = (files) => {
-  
   let modals = files
     .filter((file) => [".mdl", ".amdl"].find((el) => file.includes(el))) // Adjust file type as needed
     .map((file) => {
@@ -26,7 +25,7 @@ const generateEnum = (files) => {
     });
 
   enumEntries.push(...modals);
-  createFileNames()
+  createFileNames();
 };
 
 // Initial enum generation
@@ -34,31 +33,54 @@ const debounceDelay = 100; // milliseconds
 let lastEventTime = 0;
 
 function watchDirectory(dir) {
+  const found = dir.split("/").find((el) => el.startsWith("."));
+  if (
+    found ||
+    [
+      "assets",
+      "composables",
+      "node_modules",
+      "dist",
+      "config",
+      "directives",
+      "middleware",
+      "plugins",
+      "server",
+      "service",
+      "stores",
+      "store",
+      "types",
+      "type",
+      "utils",
+    ].find((el) => dir.includes(el))
+  )
+    return;
+
   // Watch the current directory
   watch(dir, (eventType, filename) => {
     const currentTime = Date.now();
     // Debounce: Check if the last event was too recent
     if (currentTime - lastEventTime < debounceDelay) {
-        return;
+      return;
     }
     lastEventTime = currentTime;
-    const isModal = [".mdl", ".amdl"].find((el) => filename.includes(el))
-    const name = filename.split('/').at(-1).split('.')[0]
-    
-    if(isModal && enumEntries.includes(`'${name}'`)) {
-      enumEntries = enumEntries.filter(el => el != `'${name}'`)
-      createFileNames()
+    const isModal = [".mdl", ".amdl"].find((el) => filename.includes(el));
+    const name = filename.split("/").at(-1).split(".")[0];
+
+    if (isModal && enumEntries.includes(`'${name}'`)) {
+      enumEntries = enumEntries.filter((el) => el != `'${name}'`);
+      createFileNames();
     } else if (isModal) {
       generateEnum([filename]);
     }
-  });   
+  });
 
   // Read the contents of the directory to find nested directories
   readdir(dir, (err, files) => {
     if (err) {
       return console.error(`Unable to scan directory: ${err}`);
     }
-    
+
     generateEnum(files);
     files.forEach((file) => {
       const filePath = join(dir, file);
