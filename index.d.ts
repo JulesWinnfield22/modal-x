@@ -43,7 +43,7 @@ export function useModal(): {
     data?: ModalRegistry[K]["Props"],
     cb?: ModalCallback<ModalRegistry[K]["ReturnType"]>,
     options?: ModalOptions,
-  ) => Promise<ModalRegistry[K]["ReturnType"] | false | void>;
+  ) => Promise<ModalRegistry[K]["ReturnType"]>;
   closeModal: (response?: any, sendResponse?: boolean) => void;
   getModal: (name: FileNames | string) => ModalItem | undefined;
   loadSpinners: (modal: any, name: string, group?: string) => Promise<void>;
@@ -64,7 +64,7 @@ export function openModal<K extends FileNames>(
   data?: ModalRegistry[K]["Props"],
   cb?: ModalCallback<ModalRegistry[K]["ReturnType"]>,
   options?: ModalOptions,
-): Promise<ModalRegistry[K]["ReturnType"] | false | void>;
+): Promise<ModalRegistry[K]["ReturnType"]>;
 
 /**
  * Closes the topmost open modal.

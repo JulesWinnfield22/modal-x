@@ -41,7 +41,7 @@ const MARKER_START = '// [MODAL-X] AUTO-GENERATED INSTANCE';
 const GET_BLOCK = (hasProps, hasReturnType) => {
   const propsType = hasProps ? 'Props' : 'any';
   const returnType = hasReturnType ? 'ReturnType' : 'any';
-  return `\n${MARKER_START}\n// [MODAL-X] Managed Props: This block is auto-generated for strict type safety.\ndefineProps<{ data: ${propsType}; close: (res: ${returnType}) => void }>();\n`;
+  return `\n${MARKER_START}\nconst props = defineProps<{ data: ${propsType}; close: (res: ${returnType}) => void }>();\n`;
 };
 
 function modalTypesPlugin(options = {}) {
@@ -69,10 +69,21 @@ function modalTypesPlugin(options = {}) {
         const lines = content.split('\n');
         const startIndex = lines.findIndex(l => l.includes(MARKER_START));
         if (startIndex !== -1) {
-          const currentCallLine = lines[startIndex + 1];
           const targetCallLine = targetBlock.trim().split('\n')[1];
-          if (currentCallLine && currentCallLine.trim() !== targetCallLine.trim()) {
-            lines[startIndex + 1] = targetCallLine;
+          let definePropsIndex = -1;
+          for (let i = startIndex + 1; i <= startIndex + 5 && i < lines.length; i++) {
+            if (lines[i].includes('defineProps')) {
+              definePropsIndex = i;
+              break;
+            }
+          }
+          if (definePropsIndex !== -1) {
+            if (lines[definePropsIndex].trim() !== targetCallLine.trim()) {
+              lines[definePropsIndex] = targetCallLine;
+              fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+            }
+          } else {
+            lines.splice(startIndex + 1, 0, targetCallLine);
             fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
           }
         }
