@@ -85,11 +85,8 @@ Inside your `*.mdl.vue` or `*.amdl.vue` file, simply export `Props` and `ReturnT
     newName: string
   }
 
-  // 3. Define Props with 'close' function for full type safety
-  const props = defineProps<{
-    data: Props,
-    close: (res: ReturnType) => void
-  }>()
+  // [MODAL-X] Managed Props: This block is auto-generated for strict type safety.
+  defineProps<{ data: Props; close: (res: ReturnType) => void }>();
 </script>
 
 <template>
