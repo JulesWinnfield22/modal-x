@@ -1,2 +1,3 @@
-export type FileNames = 'FileNames'
-
+export const MODALS = {};
+export interface ModalRegistry {}
+export type FileNames = never;

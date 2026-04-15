@@ -10,10 +10,13 @@ const props = defineProps({
   },
 });
 
-const { modals, getModal, options } = useModal();
+const { modalName, modals, getModal } = useModal();
+
 const name = props.name || (getCurrentInstance().parent?.type?.__name
 ? getCurrentInstance().parent.type.__name.split(".")[0]
 : props.name)
+
+modalName.value = name || '';
 
 const modal = ref();
 watch(
@@ -21,11 +24,11 @@ watch(
   (modals) => {
     modal.value = getModal(name);
   },
-  { immediate: true }
+  { deep: true, immediate: true }
 );
 
 function escListener(e) {
-  if (e.key === "Escape" && modals?.length && options.value?.[name]?.autoClose) {
+  if (e.key === "Escape" && modals?.length && (modal.value?.options?.closeonEsc ?? true)) {
     closeModal();
   }
 }
@@ -40,7 +43,7 @@ onUnmounted(() => {
 </script>
 <template>
   <div
-    @click.self="options.value[name].autoClose && closeModal()"
+    @click.self="(modal.options?.closeOnOverlayClick ?? true) && closeModal()"
     :class="[!modal?.active ? '__inactive' : '__active']"
     class="__modal"
   >

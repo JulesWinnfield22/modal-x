@@ -1,23 +1,40 @@
 {
   "name": "@customizer/modal-x",
-  "version": "0.0.88",
+  "version": "0.1.91",
   "private": false,
-  "bin": {
-    "watchmodal": "./generateFileNames.cjs"
-  },
+  "description": "Lightweight, file-based modal system for Vue 3 with automatic type-safety, Promise-based API, and zero boilerplate. Distributed as source files to allow Vite to perform global file scanning and perfect code-splitting in your project.",
   "keywords": [
-    "Modal",
-    "File Based Modals",
-    "Dialogs"
+    "vue",
+    "vue3",
+    "modal",
+    "dialog",
+    "vite",
+    "vite-plugin",
+    "file-based",
+    "typescript",
+    "type-safe",
+    "promise-api",
+    "dx",
+    "boilerplate-free"
   ],
-  "types": "./index.d.ts",
+  "author": "JulesWinnfield22",
+  "license": "MIT",
+  "homepage": "https://github.com/JulesWinnfield22/modal-x#readme",
+  "bugs": {
+    "url": "https://github.com/JulesWinnfield22/modal-x/issues"
+  },
+  "types": "index.d.ts",
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",
+  "files": [
+    "*.{js,cjs,d.ts,vue,css}",
+    "src/**/*.{vue,js}",
+    "store/**/*.js",
+    "plugins/**/*.js"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
     "test:unit": "vitest"
   },
   "repository": {
@@ -25,7 +42,6 @@
     "url": "https://github.com/JulesWinnfield22/modal-x.git"
   },
   "dependencies": {
-    "pinia": "^2.1.6",
     "vue": "^3.3.4"
   },
   "devDependencies": {

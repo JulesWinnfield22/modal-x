@@ -1,5 +1,5 @@
 <script setup>
-import { useModal, options } from "./store/modal";
+import { useModal } from "./store/modal";
 import {
   watch,
   ref,
@@ -10,7 +10,6 @@ import {
   nextTick,
   watchEffect,
 } from "vue";
-import { storeToRefs } from "pinia";
 import { FileType } from "./enums";
 
 import "./style.css";
@@ -30,43 +29,39 @@ const { modals, getModal, loadModal, loadGlobalSpinner, loadSpinners } =
   useModal();
 
 async function load(modules) {
-  let names = Object.keys(modules).map((name) => {
-    const file = name.split("/").at(-1);
-    const type = getFileType(file)
+  const paths = Object.keys(modules);
+  
+  paths.forEach((path) => {
+    const file = path.split("/").pop();
+    const type = getFileType(file);
+    const nameParts = file.replace(/\.(mdl|s|g)\.vue$/, '').split('.');
+    const name = nameParts[0];
+    const group = type === FileType.SPINNER ? nameParts[1] : undefined;
     
-    return {
-      name: file.split(".").at(0),
-      type,
-      group: type == FileType.SPINNER ? file.match(/(.+)\.s\.vue$/)?.[1]?.split('.')?.[1] : undefined
-    };
-  });
+    const component = modules[path].default || modules[path];
 
-  const promise = Object.keys(modules).map((mdl) => {
-    return defineAsyncComponent({
-      loader: modules[mdl],
-    });
-  });
-
-  const res = await Promise.all(promise);
-
-  res.forEach(async (el, idx) => {
-    if (names[idx].type == FileType.MODAL) {
-      loadModal(el, names[idx].name);
-    } else if (names[idx].type == FileType.SPINNER) {
-      loadSpinners(el, names[idx].name, names[idx].group);
-    } else if (names[idx].type == FileType.GLOBAL_SPINNER) {
-      loadGlobalSpinner(el, names[idx].name);
+    if (type === FileType.MODAL) {
+      loadModal(component, name, false);
+    } else if (type === FileType.SPINNER) {
+      loadSpinners(component, name, group, false);
+    } else if (type === FileType.GLOBAL_SPINNER) {
+      loadGlobalSpinner(component, name, false);
     }
   });
 }
 
 function loadAllModals() {
-  const modules = import.meta.glob([`/**/*.{mdl,s,g}.vue`, "!./node_modules"]);
-  let mods = { ...modules };
-  load(mods);
+  const modules = import.meta.glob([
+    '/**/*.mdl.vue',
+    '/**/*.s.vue',
+    '/**/*.g.vue',
+    '!**/node_modules/**',
+  ], { eager: true });
+  
+  load(modules);
 }
 
-const { fetchedModals } = storeToRefs(useModal());
+const { fetchedModals } = useModal();
 
 const showModal = ref(false);
 
@@ -181,7 +176,7 @@ watch(showModal, () => {
     class="__modal-parent"
   >
     <template v-for="{ id, modal } in fetchedModals" :key="id">
-      <component v-bind="options[id]" v-if="modals?.length && getModal(id)" :is="modal" />
+      <component v-if="modals?.length && getModal(id)" :is="modal" />
     </template>
   </div>
 </template>
