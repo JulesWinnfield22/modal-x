@@ -102,8 +102,23 @@ function modalTypesPlugin(options = {}) {
         updatedContent = content.replace(scriptSetupTag, newTag);
         scriptSetupTag = newTag;
       }
-      const insertIndex = updatedContent.indexOf(scriptSetupTag) + scriptSetupTag.length;
-      fs.writeFileSync(filePath, updatedContent.slice(0, insertIndex) + targetBlock + updatedContent.slice(insertIndex), 'utf-8');
+      const scriptSetupIdx = updatedContent.indexOf(scriptSetupTag) + scriptSetupTag.length;
+      let insertIndex = scriptSetupIdx;
+
+      const importsRegex = /import\s+(?:type\s+)?(?:[\w*{},\s]+from\s+['"][^'"]+['"]|['"][^'"]+['"])\s*;?/g;
+      importsRegex.lastIndex = scriptSetupIdx;
+
+      let match;
+      const scriptEndIdx = updatedContent.indexOf('</script>', scriptSetupIdx);
+      const limitIdx = scriptEndIdx !== -1 ? scriptEndIdx : updatedContent.length;
+
+      while ((match = importsRegex.exec(updatedContent)) !== null) {
+          if (match.index > limitIdx) break;
+          insertIndex = match.index + match[0].length;
+      }
+      
+      const insertPrefix = insertIndex === scriptSetupIdx ? '\n' : '\n\n';
+      fs.writeFileSync(filePath, updatedContent.slice(0, insertIndex) + insertPrefix + targetBlock.trim() + '\n' + updatedContent.slice(insertIndex), 'utf-8');
     } catch (err) {}
   };
 
