@@ -41,7 +41,7 @@ const MARKER_START = '// [MODAL-X] AUTO-GENERATED INSTANCE';
 const GET_BLOCK = (hasProps, hasReturnType) => {
   const propsType = hasProps ? 'Props' : 'any';
   const returnType = hasReturnType ? 'ReturnType' : 'any';
-  return `\n${MARKER_START}\nconst props = defineProps<{ data: ${propsType}; close: (res: ${returnType}) => void }>();\n`;
+  return `\n${MARKER_START}\n// [MODAL-X] Managed Props: This block is auto-generated for strict type safety.\nconst props = defineProps<{ data: ${propsType}; close: (res: ${returnType}) => void }>();\n`;
 };
 
 function modalTypesPlugin(options = {}) {
