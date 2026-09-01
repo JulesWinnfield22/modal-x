@@ -451,6 +451,170 @@ These are defaults; `onDoubleBack` can be overridden per modal via
 
 ---
 
+## 📚 API Reference
+
+Everything exported from `@customizer/modal-x`, with a distinctive example for each.
+
+### `openModal(name, data?, cb?, options?) → Promise<ReturnType>`
+
+Opens a modal and resolves when it closes. `data` is passed to the modal; `cb` is
+the legacy callback slot (pass `undefined` for the Promise API); `options` is the
+settings object.
+
+```js
+import { openModal, MODALS } from "@customizer/modal-x";
+
+// 1. Promise form — await the result
+const color = await openModal("ColorPicker", { initial: "#ff0000" });
+
+// 2. Legacy callback form (3rd arg fires with the close response)
+openModal("ColorPicker", { initial: "#ff0000" }, (picked) => {
+  console.log("picked", picked);
+});
+
+// 3. Nested modals — a wizard where each step opens the next
+async function runWizard() {
+  const a = await openModal(MODALS.WizardStep1);
+  if (a === false) return;                 // cancelled
+  await openModal(MODALS.WizardStep2, { fromStep1: a });
+}
+
+// 4. A transient modal that shouldn't touch browser history
+openModal("Toast", { text: "Saved!" }, undefined, { skipHistory: true });
+```
+
+### `closeModal(response?, sendResponse?) → Promise<boolean>`
+
+Closes the **topmost** modal, running its `beforeClose` guard first. The value you
+pass becomes the resolution of the original `openModal(...)` promise.
+
+```js
+import { closeModal } from "@customizer/modal-x";
+
+closeModal({ saved: true }); // openModal(...) resolves with { saved: true }
+closeModal(null, false);     // close, but resolve with `undefined` (send nothing)
+```
+
+> Inside a modal component, prefer the injected **`close`** prop — it's type-safe
+> against your `ReturnType`.
+
+### `forceCloseModal(response?, sendResponse?) → Promise<boolean>`
+
+Like `closeModal`, but **skips** the `beforeClose` guard — for intentional teardown
+where a dirty-form confirmation would be wrong.
+
+```js
+import { forceCloseModal } from "@customizer/modal-x";
+
+async function onSubmit(values) {
+  await api.save(values);
+  forceCloseModal({ saved: true }); // no "discard changes?" prompt
+}
+```
+
+### `onBeforeModalClose(fn) → () => void`
+
+Registers a guard on the current topmost modal; returns an **unregister** function.
+Runs for every close path. See
+[Intercepting a close](#intercepting-a-close--onbeforemodalclose) for a full
+example. Most apps use `useCloseGuard` instead.
+
+```js
+const stop = onBeforeModalClose(() => confirm("Close this modal?"));
+// later: stop();  // remove the guard
+```
+
+### `getModal(name) → ModalItem | undefined`
+
+Look up an open modal instance by name (e.g. to check whether it's currently open).
+
+```js
+import { getModal } from "@customizer/modal-x";
+
+if (getModal("CartDrawer")) {
+  // the cart drawer is already open — don't open a second one
+}
+```
+
+### `useModal() → store`
+
+Returns the reactive store and every action — handy for programmatic control or
+reading the live stack from anywhere (component or plain module).
+
+```js
+import { useModal } from "@customizer/modal-x";
+
+const { modals, openModal, closeModal } = useModal();
+
+const depth = modals.length;          // how many modals are stacked right now
+const top = modals[0]?.modalToOpen;   // name of the topmost modal
+```
+
+### `MODALS`
+
+A generated constant of your modal names (via the Vite plugin) enabling
+autocomplete and "Go to Definition".
+
+```js
+import { openModal, MODALS } from "@customizer/modal-x";
+openModal(MODALS.UserForm, { userId: "1" }); // ⌘-click MODALS.UserForm → the file
+```
+
+### `setModalConfig(partial)` / `getModalConfig() → config`
+
+Read or update the library-wide config at runtime (same keys as the plugin options).
+
+```js
+import { setModalConfig, getModalConfig } from "@customizer/modal-x";
+
+setModalConfig({ debugHistory: true });     // turn history tracing on at runtime
+getModalConfig().onDoubleBack;              // → 'ignore'
+```
+
+### `useCloseGuard(opts) → { isDirty, markPristine }`
+
+Confirm-before-close for a form **inside a modal** (core, no vue-router). Full
+options in [Unsaved-Changes Guards](#-unsaved-changes-guards-v04).
+
+```js
+import { useCloseGuard } from "@customizer/modal-x";
+const { isDirty } = useCloseGuard({ track: () => form.value });
+```
+
+### Dirty helpers — `isDirty`, `normalizeForCompare`, `hashForCompare`
+
+Pure value-comparison utilities that ignore cosmetic noise (trims strings; treats
+`""`/`null`/`undefined`/empty arrays as empty; strips `fakeId` keys).
+
+```js
+import { isDirty, normalizeForCompare, hashForCompare } from "@customizer/modal-x";
+
+isDirty({ name: "Ann" }, { name: "Ann " });    // false — trailing space trimmed
+isDirty({ rows: [] }, { rows: [{ v: "" }] });   // false — empty seeded row ignored
+isDirty({ name: "Ann" }, { name: "Bob" });      // true
+
+normalizeForCompare("   ");                      // undefined  (blank → empty)
+hashForCompare({ b: 2, a: 1 }) === hashForCompare({ a: 1, b: 2 }); // true — key order stable
+```
+
+### `ModalParent`
+
+Advanced/internal — the wrapper component modal-x renders each modal into. You
+normally never import it; `app.use(modal)` mounts the modal root automatically.
+
+### Router subpath — `@customizer/modal-x/router`
+
+- **`useLeaveGuard(opts)`** — guard a **route** being left.
+- **`useUnsavedGuard(opts)`** — guard **either** a route or a modal (auto-detects).
+
+See [Unsaved-Changes Guards](#-unsaved-changes-guards-v04) for full examples.
+
+```js
+import { useLeaveGuard, useUnsavedGuard } from "@customizer/modal-x/router";
+```
+
+---
+
 ## ⚠️ Breaking Changes (v3.0)
 
 1. **Pinia Dropped**: You no longer need to setup a Pinia store to use Modal-X. The library now uses native Vue module-level reactivity.
