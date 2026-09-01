@@ -1,5 +1,6 @@
 <script setup>
 import { useModal } from "./store/modal";
+import { installHistoryManager } from "./store/history.js";
 import {
   watch,
   ref,
@@ -13,7 +14,6 @@ import {
 import { FileType } from "./enums";
 
 import "./style.css";
-import { closeModal } from ".";
 
 function getFileType(file) {
   if (file.endsWith(".s.vue")) {
@@ -25,7 +25,7 @@ function getFileType(file) {
   }
 }
 
-const { modals, getModal, loadModal, loadGlobalSpinner, loadSpinners } =
+const { modals, getModal, loadModal, loadGlobalSpinner, loadSpinners, closeModal, getModalConfig } =
   useModal();
 
 async function load(modules) {
@@ -150,6 +150,7 @@ watch(
 
 onMounted(() => {
   document.addEventListener("keydown", tabListener);
+  installHistoryManager({ modals, closeModal, getModalConfig });
 });
 
 onUnmounted(() => {

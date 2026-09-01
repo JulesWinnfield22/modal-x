@@ -215,6 +215,46 @@ Inside your modal file, you can either use the global `closeModal()` or the reco
 
 ---
 
+### Guarding a Close & Browser Back (v0.3)
+
+Every modal now pushes a **hidden, same-URL browser-history entry** when it opens, so the **browser Back button closes the topmost modal** instead of navigating your app away. The URL bar never changes.
+
+You can intercept a close — to confirm unsaved changes, block while a request is in flight, etc. — with the **`onBeforeModalClose`** hook. It runs for **every** close path: the X button, overlay click, ESC, browser Back, and programmatic `closeModal()`.
+
+```html
+<!-- src/modals/EditThing.mdl.vue -->
+<script setup>
+  import { onBeforeModalClose, openModal } from "@customizer/modal-x";
+
+  // Return true to allow the close, false to keep the modal open.
+  onBeforeModalClose(async () => {
+    if (!isDirty.value) return true;
+    // Confirmations should not add their own history entry:
+    return await openModal(
+      "ConfirmationModal",
+      { message: "Discard unsaved changes?" },
+      undefined,
+      { skipHistory: true },
+    );
+  });
+</script>
+```
+
+**Behavior with Back:**
+
+- **Back** on a guarded modal → the guard runs (e.g. shows your confirmation). The URL stays put.
+- **Cancel** the confirmation → the modal stays open.
+- **Confirm**, _or press **Back a second time** while the confirmation is showing_ → the modal is discarded and closed.
+
+**Notes:**
+
+- Pass `{ skipHistory: true }` in the modal `options` (4th arg of `openModal`) for transient modals — confirmations, spinners — so they don't push history entries.
+- `popstate` is not cancelable, so Back is handled with a "let it pop, re-push a buffer" technique — invisible because entries share the current URL.
+- Use **`forceCloseModal(response)`** to close while skipping the `beforeClose` guard (e.g. after a successful submit, where a dirty-form prompt would be wrong).
+- **Forward** does not reconstruct a closed modal (modal `data` isn't serializable into history state).
+
+---
+
 ## ⚠️ Breaking Changes (v3.0)
 
 1. **Pinia Dropped**: You no longer need to setup a Pinia store to use Modal-X. The library now uses native Vue module-level reactivity.

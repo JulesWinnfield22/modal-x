@@ -1,6 +1,6 @@
 {
   "name": "@customizer/modal-x",
-  "version": "0.2.91",
+  "version": "0.3.9",
   "private": false,
   "description": "Lightweight, file-based modal system for Vue 3 with automatic type-safety, Promise-based API, and zero boilerplate. Distributed as source files to allow Vite to perform global file scanning and perfect code-splitting in your project.",
   "keywords": [
@@ -31,7 +31,9 @@
     "*.{js,cjs,d.ts,vue,css}",
     "src/**/*.{vue,js}",
     "store/**/*.js",
-    "plugins/**/*.js"
+    "plugins/**/*.js",
+    "guards/**/*.js",
+    "router/**/*.{js,d.ts}"
   ],
   "scripts": {
     "dev": "vite",
@@ -44,13 +46,21 @@
   "dependencies": {
     "vue": "^3.3.4"
   },
+  "peerDependencies": {
+    "vue-router": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "vue-router": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.3.1",
     "@vitejs/plugin-vue-jsx": "^3.0.2",
     "@vue/test-utils": "^2.4.1",
     "jsdom": "^22.1.0",
-    "vite": "^4.4.9",
-    "vitest": "^0.34.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11",
     "vue-router": "^4.2.4"
   }
 }

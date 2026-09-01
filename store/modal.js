@@ -9,6 +9,7 @@ import {
 } from "vue";
 import ModalParent from '../ModalParent.vue'
 import Spinner from "../Spinner.vue";
+import { markIgnoredPop } from "./history.js";
 
 // ── Global Singleton State ──
 // We use globalThis to ensure that even if the library is imported through different paths
@@ -22,7 +23,29 @@ if (!globalThis[STORE_KEY]) {
     spinners: shallowRef([]),
     globalSpinner: shallowRef(),
     modalName: ref(""),
+    // Library-wide defaults, set at plugin registration (app.use(modal, {...}))
+    // and overridable per modal via openModal(..., options).
+    //   onDoubleBack: what a browser Back does while a modal's own close
+    //   confirmation is showing —
+    //     'ignore' (default): absorb Back, keep the confirmation open; the user
+    //                resolves it via its Cancel/Confirm buttons. Most robust.
+    //     'stay':   the Back closes only the confirmation; the edited modal stays.
+    //     'close':  the Back closes the confirmation AND the edited modal.
+    //   backCushion: how many same-URL history entries each non-transient modal
+    //   pushes. A cushion >1 keeps a rapid *double-click* of the browser Back
+    //   button (two history traversals the browser batches before our popstate
+    //   handler can re-arm) from overshooting past the app and unloading it.
+    //   debugHistory: when true, logs every history/back decision to the console
+    //   (prefixed "[modalx]") for diagnosing browser Back behavior. Off by default.
+    config: { onDoubleBack: "ignore", backCushion: 6, debugHistory: false },
   };
+}
+
+/** Console tracer, active only when config.debugHistory is on. */
+export function dlog(...args) {
+  if (globalThis[STORE_KEY]?.config?.debugHistory) {
+    console.log("[modalx]", ...args);
+  }
 }
 
 const {
@@ -32,6 +55,22 @@ const {
   globalSpinner,
   modalName,
 } = globalThis[STORE_KEY];
+
+/**
+ * Merge library-wide default options. Called by the plugin install with the
+ * options passed to `app.use(modal, options)`.
+ * @param {{ onDoubleBack?: 'stay' | 'close' }} [partial]
+ */
+export function setModalConfig(partial) {
+  if (partial && typeof partial === "object") {
+    Object.assign(globalThis[STORE_KEY].config, partial);
+  }
+}
+
+/** @returns {{ onDoubleBack: 'stay' | 'close' }} the current library-wide config. */
+export function getModalConfig() {
+  return globalThis[STORE_KEY].config;
+}
 
 /**
  * Opens a modal and returns a Promise that resolves when it is closed.
@@ -49,7 +88,7 @@ function openModal(modalToOpen, data, cb, options) {
       modal.active = false;
     });
 
-    modals.unshift({
+    const item = {
       id: Math.random().toString(36).substring(2, 9),
       modalToOpen,
       data,
@@ -57,20 +96,80 @@ function openModal(modalToOpen, data, cb, options) {
       _resolve: resolve,  // Promise resolve
       active: true,
       options,
-    });
+    };
+
+    modals.unshift(item);
+
+    // Push a hidden, SAME-URL history entry so the browser Back button closes
+    // this modal (via its beforeClose guard). Transient modals — confirmations,
+    // spinners — opt out with `{ skipHistory: true }`.
+    //
+    // Reuse the CURRENT history.state (don't invent our own) so we don't clobber
+    // an SPA router's bookkeeping — e.g. Vue Router keeps a `position` counter in
+    // history.state and miscomputes its back/forward delta if we drop it, which
+    // makes a later Back over-navigate past the underlying page.
+    if (typeof window !== "undefined" && !options?.skipHistory) {
+      // Push a small cushion of same-URL entries (not just one). A rapid
+      // double-click of Back batches two traversals before our popstate handler
+      // runs; with a cushion those land on a spare same-URL entry instead of
+      // overshooting past the app (which would unload it / fire beforeunload).
+      const depth = Math.max(1, options?.historyDepth ?? getModalConfig().backCushion ?? 1);
+      for (let i = 0; i < depth; i++) {
+        window.history.pushState(window.history.state, "");
+      }
+      item._historyPushed = true;
+      item._historyDepth = depth;
+      dlog("openModal", modalToOpen, "pushed cushion", depth, "-> len", window.history.length);
+    } else {
+      dlog("openModal", modalToOpen, options?.skipHistory ? "(skipHistory)" : "(no window)");
+    }
   });
 }
 
 /**
- * Closes the topmost modal.
+ * Closes the topmost modal, running its `beforeClose` guard first.
+ *
+ * The guard (registered via {@link onBeforeModalClose}) may return a boolean or
+ * a Promise<boolean>: a falsy result vetoes the close (the modal stays open).
+ * This is the single interception point for every close path — X button,
+ * overlay click, ESC, browser Back, and programmatic close.
  *
  * @param {*} [response] - Data to return to the opener.
  * @param {boolean} [sendResponse=true] - If false, resolves with undefined.
+ * @param {{ fromPopstate?: boolean, force?: boolean }} [opts]
+ *   - `fromPopstate`: the browser Back already popped the history entry, so
+ *     don't pop again (the history manager handles it).
+ *   - `force`: skip the `beforeClose` guard entirely.
+ * @returns {Promise<boolean>} Whether the modal actually closed.
  */
-function closeModal(response, sendResponse = true) {
-  let modal = modals.shift();
-  if (!modal) return;
+async function closeModal(response, sendResponse = true, opts = {}) {
+  const { fromPopstate = false, force = false } = opts;
 
+  const modal = modals[0];
+  dlog("closeModal", modal?.modalToOpen, "fromPopstate=", fromPopstate, "force=", force, "stack=", modals.map((m) => m.modalToOpen));
+  if (!modal) return false;
+  if (modal._closing) return false;      // guard against re-entrant close
+  modal._closing = true;
+
+  // beforeClose lifecycle hook — lets a modal veto or defer its own close.
+  if (!force && typeof modal.beforeClose === "function") {
+    let allow;
+    try {
+      allow = await modal.beforeClose(response);
+    } catch {
+      allow = false;
+    }
+    if (!allow) {
+      modal._closing = false;
+      return false;
+    }
+  }
+
+  // Remove this SPECIFIC modal by identity — an async guard may have opened and
+  // closed a transient modal (e.g. a confirmation) during the await, so the
+  // topmost is no longer guaranteed to be `modal`.
+  const idx = modals.indexOf(modal);
+  if (idx !== -1) modals.splice(idx, 1);
   modals.length && (modals[0].active = true);
 
   // Resolve the Promise (always resolve to avoid hanging)
@@ -82,6 +181,41 @@ function closeModal(response, sendResponse = true) {
   if (sendResponse && ![undefined, null].includes(response) && modal.cb) {
     modal.cb(response);
   }
+
+  // Drop the history entries we pushed for this modal — unless the browser Back
+  // already popped them (fromPopstate), in which case the history manager owns
+  // the cleanup. `history.go(-n)` fires a single popstate, so one markIgnoredPop.
+  if (modal._historyPushed && !fromPopstate && typeof window !== "undefined") {
+    const depth = modal._historyDepth || 1;
+    dlog("closeModal cleanup: go(-", depth, ") len", window.history.length);
+    markIgnoredPop();
+    window.history.go(-depth);
+  }
+
+  dlog("closeModal done", modal.modalToOpen, "remaining stack=", modals.map((m) => m.modalToOpen));
+  return true;
+}
+
+/**
+ * Closes the topmost modal WITHOUT running its `beforeClose` guard. Handy for
+ * intentional teardown (e.g. after a successful submit) where a dirty-form
+ * confirmation would be inappropriate.
+ */
+function forceCloseModal(response, sendResponse = true) {
+  return closeModal(response, sendResponse, { force: true });
+}
+
+/**
+ * Registers `fn` as the CURRENT topmost modal's beforeClose guard. Call it from
+ * a modal's content component during setup. `fn` returns boolean | Promise<boolean>
+ * (true = allow the close). Returns an unregister function.
+ */
+function onBeforeModalClose(fn) {
+  const modal = modals[0];
+  if (modal) modal.beforeClose = fn;
+  return () => {
+    if (modal) delete modal.beforeClose;
+  };
 }
 
 function getModal(name) {
@@ -221,9 +355,13 @@ export function useModal() {
     fetchedModals,
     openModal,
     closeModal,
+    forceCloseModal,
+    onBeforeModalClose,
     getModal,
     loadModal,
     loadGlobalSpinner,
     modalName,
+    setModalConfig,
+    getModalConfig,
   };
 }
