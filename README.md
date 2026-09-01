@@ -13,6 +13,8 @@ Easily manage complex modal stacks with zero boilerplate, full type safety, and 
 - 🎯 **Type Safety**: Automatic type generation for modal names, props, and return values.
 - ⚡ **Lazy Loading**: Automatic code-splitting for `*.amdl.vue` files.
 - 🎨 **Dynamic Spinners**: Built-in support for global and modal-specific loading skeletons.
+- 🔙 **Browser Back Integration**: The browser **Back** button closes the top modal (optionally after a confirmation) instead of navigating your app away — via **vue-router** (recommended) or a **popstate fallback**.
+- 📝 **Unsaved-Changes Guards**: Drop-in composables (`useCloseGuard` / `useLeaveGuard` / `useUnsavedGuard`) to confirm before closing a dirty modal or leaving a dirty route.
 - 📦 **Pure ESM Distribution**: Distributed as source files to allow Vite to perform global file scanning and perfect code-splitting in your project.
 
 ---
@@ -42,6 +44,21 @@ const app = createApp(App);
 app.use(modal); // This adds the <Modal /> root for you automatically
 app.mount("#app");
 ```
+
+> [!IMPORTANT]
+> **Using vue-router? Pass your router instance.** This enables the reliable
+> **router mode** for the browser Back button (see
+> [Browser Back & History Integration](#-browser-back--history-integration-v04)).
+> Register the router **before** modal-x.
+>
+> ```javascript
+> import router from "./router";
+>
+> app.use(router);
+> app.use(modal, { router }); // ← enables router mode
+> ```
+>
+> Apps **without** vue-router need no options — a popstate fallback is used automatically.
 
 ### 2. Configure Vite (Optional but Recommended)
 
@@ -146,6 +163,7 @@ Modals are just regular Vue files ending in `.mdl.vue` (eager) or `.amdl.vue` (l
       {
         message: "Delete this item?",
       },
+      undefined, // 3rd arg is the legacy callback slot — pass undefined to use the Promise
       {
         closeOnOverlayClick: true, // Close when clicking backdrop
         closeonEsc: true, // Close on Escape key
@@ -181,12 +199,16 @@ if (result === false) {
 
 ### Options
 
-The third argument of `openModal` is an optional settings object:
+`openModal(name, data, cb, options)` — the **fourth** argument is an optional
+settings object (the third is the legacy callback; pass `undefined` when using the
+Promise API):
 
-| Option                | Type      | Default | Description                                     |
-| :-------------------- | :-------- | :------ | :---------------------------------------------- |
-| `closeOnOverlayClick` | `boolean` | `true`  | Closes the modal when the backdrop is clicked.  |
-| `closeonEsc`          | `boolean` | `true`  | Closes the modal when the `Esc` key is pressed. |
+| Option                | Type                              | Default | Description                                                                 |
+| :-------------------- | :-------------------------------- | :------ | :-------------------------------------------------------------------------- |
+| `closeOnOverlayClick` | `boolean`                         | `true`  | Closes the modal when the backdrop is clicked.                             |
+| `closeonEsc`          | `boolean`                         | `true`  | Closes the modal when the `Esc` key is pressed.                            |
+| `skipHistory`         | `boolean`                         | `false` | Opt out of the browser-history integration (for transient confirmations/spinners). |
+| `onDoubleBack`        | `'ignore' \| 'stay' \| 'close'`   | plugin default | Popstate-mode 2nd-Back policy for this modal (see [Browser Back](#-browser-back--history-integration-v04)). |
 
 ### Closing a Modal
 
@@ -212,6 +234,220 @@ Inside your modal file, you can either use the global `closeModal()` or the reco
   </div>
 </template>
 ```
+
+---
+
+## 🔙 Browser Back & History Integration (v0.4)
+
+Modal-X makes the browser **Back** button close the top modal instead of navigating
+your app away. It picks one of **two modes automatically**, based on whether you
+give it a vue-router instance:
+
+| Mode | When | How Back is handled | URL while open |
+| :--- | :--- | :--- | :--- |
+| **Router mode** _(recommended)_ | You pass `{ router }` to the plugin | Through vue-router's **`beforeEach`** guard | `?_mx=<id>` query is added |
+| **Popstate fallback** | No router passed | A same-URL **`popstate`** scheme | URL is unchanged |
+
+> [!WARNING]
+> **If your app uses vue-router, you must pass it** (`app.use(modal, { router })`).
+> If vue-router is present but *not* passed, the popstate fallback runs and can be
+> unreliable — vue-router handles the `popstate` event first and our handler may
+> not see the second Back. Passing the router routes Back through vue-router's own
+> navigation system, which is reliable.
+>
+> Apps with **no** vue-router at all use the popstate fallback and work correctly.
+
+### Router mode
+
+Opening a modal performs a real, in-place navigation that adds a `?_mx=<id>` query
+param (the route/page component does **not** change). The browser Back then becomes
+a genuine vue-router navigation intercepted by a global `beforeEach` guard:
+
+- **Back on a plain (unguarded) modal** → the modal closes, `?_mx` is removed.
+- **Back on a guarded modal with unsaved changes** → navigation is blocked and your
+  confirmation is shown; the URL stays at `?_mx`.
+- **Confirm** (or press **Back again** while the confirmation is showing) → both the
+  confirmation and the modal close, and `?_mx` is removed.
+- **Cancel** → the confirmation closes and the modal stays open.
+- The modal's **X / ESC / overlay** close of a guarded modal is routed through the
+  same guard, so button-close and Back behave identically.
+
+### Popstate fallback (no vue-router)
+
+Each non-transient modal pushes a few hidden, **same-URL** history entries when it
+opens (the URL bar never changes). Back is handled with a "let it pop, re-arm a
+buffer, run the guard" technique. What a second Back does while the confirmation is
+showing is configurable per the **`onDoubleBack`** option:
+
+| `onDoubleBack` | 2nd Back while confirmation is showing |
+| :--- | :--- |
+| `'ignore'` _(default)_ | Ignored — the confirmation stays open; resolve it with its buttons |
+| `'stay'` | Closes only the confirmation; the edited modal stays open |
+| `'close'` | Closes the confirmation **and** the edited modal |
+
+### Intercepting a close — `onBeforeModalClose`
+
+This is the low-level hook both modes build on. It runs for **every** close path —
+X button, overlay click, ESC, browser Back, and programmatic `closeModal()` — and
+returns `true` to allow the close or `false` to keep the modal open (a `Promise` is
+awaited, so you can show an async confirmation).
+
+```html
+<!-- src/modals/EditThing.mdl.vue -->
+<script setup>
+  import { onBeforeModalClose, openModal } from "@customizer/modal-x";
+
+  // Return true to allow the close, false to keep the modal open.
+  onBeforeModalClose(async () => {
+    if (!isDirty.value) return true;
+    // Transient confirmations must not push their own history entry:
+    return await openModal(
+      "ConfirmationModal",
+      { message: "Discard unsaved changes?" },
+      undefined,
+      { skipHistory: true },
+    );
+  });
+</script>
+```
+
+> Most apps won't call `onBeforeModalClose` directly — the
+> [Unsaved-Changes Guards](#-unsaved-changes-guards-v04) below wrap it (and dirty
+> tracking + a confirmation) into a one-liner.
+
+### Notes
+
+- **`{ skipHistory: true }`** in the modal `options` (4th arg of `openModal`) opts a
+  transient modal — confirmations, spinners — out of the history integration.
+- **`forceCloseModal(response)`** closes the top modal while **skipping** the
+  `beforeClose` guard (e.g. right after a successful submit, where a dirty-form
+  prompt would be wrong).
+- **Forward** does not reconstruct a closed modal (a modal's `data` isn't
+  serializable into history state).
+- Set **`debugHistory: true`** in the plugin options to log every history/Back
+  decision to the console (prefixed `[modalx]`) while diagnosing.
+
+---
+
+## 📝 Unsaved-Changes Guards (v0.4)
+
+Three composables turn "confirm before you lose unsaved changes" into a one-liner.
+They track values, and when dirty, run a confirmation before the modal closes or the
+route is left — for **every** trigger (X, ESC, overlay, browser Back, tab close).
+
+| Composable | Import from | Guards | Requires vue-router |
+| :--- | :--- | :--- | :--- |
+| `useCloseGuard` | `@customizer/modal-x` | A **modal** closing | No |
+| `useLeaveGuard` | `@customizer/modal-x/router` | A **route** being left | Yes |
+| `useUnsavedGuard` | `@customizer/modal-x/router` | **Either** (auto-detects) | Yes |
+
+> The router-aware composables live under the **`@customizer/modal-x/router`**
+> subpath so the core package stays vue-only.
+
+### A form inside a modal — `useCloseGuard`
+
+```html
+<!-- src/modals/EditUser.mdl.vue -->
+<script setup>
+  import { ref } from "vue";
+  import { useCloseGuard } from "@customizer/modal-x";
+
+  const form = ref({ name: "", email: "" });
+
+  const { isDirty, markPristine } = useCloseGuard({
+    track: () => form.value, // watched for changes
+    message: "You have unsaved changes. Discard them?",
+    confirmText: "Discard",
+    cancelText: "Keep editing",
+  });
+
+  async function save() {
+    await api.save(form.value);
+    markPristine(); // reset the baseline so closing no longer prompts
+  }
+</script>
+```
+
+### A form on a route — `useLeaveGuard`
+
+```html
+<script setup>
+  import { useLeaveGuard } from "@customizer/modal-x/router";
+
+  useLeaveGuard({
+    track: () => form.value,
+    message: "Leave without saving?",
+  });
+</script>
+```
+
+### Works in both places — `useUnsavedGuard`
+
+Use this in a form component that might be rendered **either** on a route **or**
+inside a modal — it detects the context and guards the right thing.
+
+```html
+<script setup>
+  import { useUnsavedGuard } from "@customizer/modal-x/router";
+  useUnsavedGuard({ track: () => form.value });
+</script>
+```
+
+### Guard options
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| `track` | `() => any` | Values to watch. A pristine snapshot is captured on setup and compared (uses the dirty helpers below). |
+| `pristine` | `() => any` | Explicit baseline getter (defaults to the first `track()` value). |
+| `isDirty` | `() => boolean` | Bring-your-own dirty check; takes precedence over `track`/`pristine`. |
+| `onConfirm` | `(signal: AbortSignal) => boolean \| Promise<boolean>` | Bring-your-own confirmation UI. The `signal` aborts when the guard wants to cancel (e.g. a 2nd Back). Defaults to the built-in `ConfirmationModal`. |
+| `modal` | `string` | Built-in confirmation modal name (default `"ConfirmationModal"`). |
+| `title` / `message` / `confirmText` / `cancelText` | `string` | Text passed to the built-in confirmation. |
+| `enabled` | `() => boolean` | Return `false` to disable the guard entirely. |
+| `isSubmitting` | `() => boolean` | Return `true` to skip the guard while a submit is in flight. |
+| `beforeUnload` | `boolean` | Also guard tab-close / refresh via the native `beforeunload` prompt (default `true`). |
+| `onDoubleBack` | `'ignore' \| 'stay' \| 'close'` | Popstate-mode double-back policy for this modal (overrides the plugin default). |
+
+Every guard returns `{ isDirty, markPristine }` — call **`markPristine()`** after a
+successful save (or once async data finishes loading) to reset the "dirty" baseline.
+
+### Dirty-diff helpers
+
+The value-comparison utilities are exported for standalone use. They ignore cosmetic
+differences (trims strings; treats `""`/`null`/`undefined`/empty arrays as empty;
+strips `fakeId` keys) so seeded-but-untouched form rows don't read as dirty.
+
+```javascript
+import { isDirty, normalizeForCompare, hashForCompare } from "@customizer/modal-x";
+
+isDirty(pristineValues, currentValues); // → boolean
+```
+
+---
+
+## ⚙️ Plugin Configuration
+
+Pass library-wide options as the second argument to `app.use`:
+
+```javascript
+app.use(modal, {
+  router,                 // your vue-router instance → enables router mode
+  onDoubleBack: "ignore", // popstate-mode 2nd-Back policy (default 'ignore')
+  backCushion: 6,         // popstate-mode: same-URL entries pushed per modal
+  debugHistory: false,    // log history/Back decisions to the console
+});
+```
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `router` | vue-router `Router` | `undefined` | Enables **router mode**. Omit for the popstate fallback. |
+| `onDoubleBack` | `'ignore' \| 'stay' \| 'close'` | `'ignore'` | Popstate-mode 2nd-Back behavior (see the table above). Router mode always closes both. |
+| `backCushion` | `number` | `6` | Popstate-mode only: how many same-URL history entries each modal pushes (a deeper cushion survives rapid Back double-clicks). |
+| `debugHistory` | `boolean` | `false` | Log every history/Back decision to the console (`[modalx]`). |
+
+These are defaults; `onDoubleBack` can be overridden per modal via
+`openModal(name, data, cb, { onDoubleBack: 'close' })` or via a guard's
+`onDoubleBack` option.
 
 ---
 

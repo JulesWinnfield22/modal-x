@@ -1,5 +1,5 @@
 import ModalParent from "./ModalParent.vue"
-import { useModal } from "./store/modal"
+import { useModal, setModalConfig, getModalConfig } from "./store/modal"
 import modal from "./plugins/modal"
 
 /**
@@ -25,7 +25,33 @@ function openModal(modalToOpen, data, cb, options) {
  */
 function closeModal(response = false, sendResponse = true) {
   const { closeModal: CM } = useModal();
-  CM(response, sendResponse);
+  return CM(response, sendResponse);
+}
+
+/**
+ * Closes the topmost modal WITHOUT running its beforeClose guard.
+ *
+ * @param {*} [response] - Optional response data to send back from the modal.
+ * @param {boolean} [sendResponse=true]
+ * @returns {Promise<boolean>}
+ */
+function forceCloseModal(response = false, sendResponse = true) {
+  const { forceCloseModal: FC } = useModal();
+  return FC(response, sendResponse);
+}
+
+/**
+ * Registers a beforeClose guard on the current topmost modal. Call during the
+ * modal content's setup. `fn` returns boolean | Promise<boolean> (true = allow
+ * the close). Runs for every close path: X, overlay, ESC, browser Back, and
+ * programmatic close. Returns an unregister function.
+ *
+ * @param {(response?: any) => boolean | Promise<boolean>} fn
+ * @returns {() => void}
+ */
+function onBeforeModalClose(fn) {
+  const { onBeforeModalClose: OB } = useModal();
+  return OB(fn);
 }
 
 /**
@@ -43,14 +69,26 @@ function getModal(name) {
 import * as enums from './FileNameEnums';
 const MODALS = enums.MODALS || {};
 
+// Dirty-diff helpers + the core (router-free) close guard.
+import { normalizeForCompare, hashForCompare, isDirty } from './dirty.js';
+import { useCloseGuard } from './guards/useCloseGuard.js';
+
 // Export the functions
 export {
   openModal,
   closeModal,
+  forceCloseModal,
+  onBeforeModalClose,
   getModal,
   useModal,
   ModalParent,
-  MODALS
+  MODALS,
+  useCloseGuard,
+  normalizeForCompare,
+  hashForCompare,
+  isDirty,
+  setModalConfig,
+  getModalConfig
 };
 
 export default modal
