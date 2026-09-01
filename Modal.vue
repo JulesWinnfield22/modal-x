@@ -1,6 +1,7 @@
 <script setup>
 import { useModal } from "./store/modal";
 import { installHistoryManager } from "./store/history.js";
+import { installRouterHistory } from "./store/routerHistory.js";
 import {
   watch,
   ref,
@@ -150,7 +151,12 @@ watch(
 
 onMounted(() => {
   document.addEventListener("keydown", tabListener);
-  installHistoryManager({ modals, closeModal, getModalConfig });
+  const router = getModalConfig().router;
+  if (router) {
+    installRouterHistory(router, { modals, closeModal });
+  } else {
+    installHistoryManager({ modals, closeModal, getModalConfig });
+  }
 });
 
 onUnmounted(() => {

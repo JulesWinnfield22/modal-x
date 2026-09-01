@@ -18,9 +18,22 @@ export interface ModalOptions {
 
 /** Options for `app.use(modal, options)`. */
 export interface ModalPluginOptions {
-  /** Library-wide default double-back policy for all modals (default 'ignore'). */
+  /**
+   * A vue-router instance. When provided, modal-x runs in **router mode**:
+   * opening a modal is a real `?_mx=<id>` query-param navigation and the browser
+   * Back is handled through vue-router's own guards (reliable in vue-router apps).
+   * Omit it in apps without vue-router — the popstate fallback is used instead.
+   * Typed loosely to avoid a hard vue-router type dependency in the core package.
+   */
+  router?: any;
+  /**
+   * Popstate-fallback double-back policy default for all modals: `'ignore'`
+   * (default — keep the confirmation open, resolve via its buttons), `'stay'`
+   * (2nd Back closes only the confirmation), `'close'` (2nd Back closes both).
+   * In router mode the 2nd Back always closes both.
+   */
   onDoubleBack?: "ignore" | "stay" | "close";
-  /** Same-URL history entries each non-transient modal pushes (default 2). */
+  /** Popstate fallback: same-URL history entries each non-transient modal pushes (default 6). */
   backCushion?: number;
   /** Log every history/Back decision to the console ("[modalx]"). Default false. */
   debugHistory?: boolean;

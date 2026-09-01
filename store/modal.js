@@ -10,6 +10,7 @@ import {
 import ModalParent from '../ModalParent.vue'
 import Spinner from "../Spinner.vue";
 import { markIgnoredPop } from "./history.js";
+import { setRouterBypass } from "./routerHistory.js";
 
 // ── Global Singleton State ──
 // We use globalThis to ensure that even if the library is imported through different paths
@@ -37,7 +38,11 @@ if (!globalThis[STORE_KEY]) {
     //   handler can re-arm) from overshooting past the app and unloading it.
     //   debugHistory: when true, logs every history/back decision to the console
     //   (prefixed "[modalx]") for diagnosing browser Back behavior. Off by default.
-    config: { onDoubleBack: "ignore", backCushion: 6, debugHistory: false },
+    //   router: (optional) a vue-router instance. When provided, modal-open is a
+    //   real (query-param) route change and the browser Back is handled through
+    //   vue-router's own navigation guards — reliable in apps where fighting
+    //   popstate directly is flaky. Without it, the same-URL popstate scheme runs.
+    config: { onDoubleBack: "ignore", backCushion: 6, debugHistory: false, router: null },
   };
 }
 
@@ -108,11 +113,19 @@ function openModal(modalToOpen, data, cb, options) {
     // an SPA router's bookkeeping — e.g. Vue Router keeps a `position` counter in
     // history.state and miscomputes its back/forward delta if we drop it, which
     // makes a later Back over-navigate past the underlying page.
-    if (typeof window !== "undefined" && !options?.skipHistory) {
-      // Push a small cushion of same-URL entries (not just one). A rapid
-      // double-click of Back batches two traversals before our popstate handler
-      // runs; with a cushion those land on a spare same-URL entry instead of
-      // overshooting past the app (which would unload it / fire beforeunload).
+    const router = getModalConfig().router;
+    if (router && !options?.skipHistory) {
+      // ROUTER MODE: opening a modal is a real (query-param) route change, so the
+      // browser Back becomes a genuine vue-router navigation we intercept via a
+      // global guard (see store/routerHistory.js). Cooperates with vue-router
+      // instead of fighting popstate.
+      const cur = router.currentRoute.value;
+      item._mxRouted = true;
+      item._mxId = item.id;
+      router.push({ query: { ...cur.query, _mx: item.id } });
+      dlog("openModal", modalToOpen, "(router) query._mx=", item.id);
+    } else if (typeof window !== "undefined" && !options?.skipHistory) {
+      // POPSTATE FALLBACK (no router): same-URL cushion scheme.
       const depth = Math.max(1, options?.historyDepth ?? getModalConfig().backCushion ?? 1);
       for (let i = 0; i < depth; i++) {
         window.history.pushState(window.history.state, "");
@@ -143,12 +156,26 @@ function openModal(modalToOpen, data, cb, options) {
  * @returns {Promise<boolean>} Whether the modal actually closed.
  */
 async function closeModal(response, sendResponse = true, opts = {}) {
-  const { fromPopstate = false, force = false } = opts;
+  const { fromPopstate = false, force = false, fromRoute = false } = opts;
 
   const modal = modals[0];
-  dlog("closeModal", modal?.modalToOpen, "fromPopstate=", fromPopstate, "force=", force, "stack=", modals.map((m) => m.modalToOpen));
+  dlog("closeModal", modal?.modalToOpen, "fromPopstate=", fromPopstate, "force=", force, "fromRoute=", fromRoute, "stack=", modals.map((m) => m.modalToOpen));
   if (!modal) return false;
   if (modal._closing) return false;      // guard against re-entrant close
+
+  // ROUTER MODE: a GUARDED routed modal being closed by a button/X/ESC/overlay
+  // (not via the router guard, not forced) is routed THROUGH vue-router so the
+  // browser Back and the button close share one path (the beforeEach guard runs
+  // the confirmation). Prevents a stale confirmation-close from "unrouting" it.
+  if (!fromRoute && !force && modal._mxRouted && typeof modal.beforeClose === "function") {
+    const router = getModalConfig().router;
+    if (router) {
+      dlog("closeModal: delegating guarded routed close to router.back()");
+      router.back(); // → beforeEach runs the guard uniformly
+      return false;
+    }
+  }
+
   modal._closing = true;
 
   // beforeClose lifecycle hook — lets a modal veto or defer its own close.
@@ -182,10 +209,21 @@ async function closeModal(response, sendResponse = true, opts = {}) {
     modal.cb(response);
   }
 
-  // Drop the history entries we pushed for this modal — unless the browser Back
-  // already popped them (fromPopstate), in which case the history manager owns
-  // the cleanup. `history.go(-n)` fires a single popstate, so one markIgnoredPop.
-  if (modal._historyPushed && !fromPopstate && typeof window !== "undefined") {
+  // History cleanup.
+  if (modal._mxRouted) {
+    // ROUTER MODE: drop this modal's `?_mx` route entry — unless the router guard
+    // is already navigating (fromRoute), in which case it owns the navigation.
+    if (!fromRoute) {
+      const router = getModalConfig().router;
+      if (router) {
+        dlog("closeModal cleanup (router): back() to drop ?_mx");
+        setRouterBypass();
+        router.back();
+      }
+    }
+  } else if (modal._historyPushed && !fromPopstate && typeof window !== "undefined") {
+    // POPSTATE FALLBACK: pop our same-URL entries. `history.go(-n)` fires a single
+    // popstate, so one markIgnoredPop.
     const depth = modal._historyDepth || 1;
     dlog("closeModal cleanup: go(-", depth, ") len", window.history.length);
     markIgnoredPop();

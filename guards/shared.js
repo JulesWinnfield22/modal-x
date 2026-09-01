@@ -1,7 +1,7 @@
 // Shared internals for the dirty-guard composables (useCloseGuard / useLeaveGuard
 // / useUnsavedGuard). Core-only — no vue-router imports here.
 
-import { useModal, dlog } from "../store/modal.js";
+import { useModal, dlog, getModalConfig } from "../store/modal.js";
 import { hashForCompare, normalizeForCompare, isDirty as isDirtyDiff } from "../dirty.js";
 
 /**
@@ -101,9 +101,12 @@ export function makeConfirm(opts) {
     // browser Back lands on it (and we close it) instead of leaking past the app.
     // Route-leave guards keep it out of history (skipHistory) — vue-router owns
     // that Back via onBeforeRouteLeave and an extra entry collides with it.
-    const modalOpts = opts.confirmInHistory
+    // In ROUTER mode the confirmation must be transient (skipHistory): the Back
+    // that would close it is handled by the router guard, not the confirm's own
+    // entry. Only the popstate-mode close guard gives the confirm its own entry.
+    const modalOpts = opts.confirmInHistory && !getModalConfig().router
       ? { historyDepth: 1, guardConfirm: true }
-      : { skipHistory: true };
+      : { skipHistory: true, guardConfirm: true }; // guardConfirm marks the transient confirm
     dlog("guard: opening built-in confirm", opts.modal || "ConfirmationModal", modalOpts);
     const res = await openModal(
       opts.modal || "ConfirmationModal",
