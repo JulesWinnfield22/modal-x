@@ -34,11 +34,11 @@ export function installHistoryManager(api) {
   const { modals, closeModal, getModalConfig } = api;
 
   // Resolve the double-back policy for the modal being guarded: its own
-  // `options.onDoubleBack` wins, else the library-wide default, else 'ignore'.
+  // `options.onDoubleBack` wins, else the library-wide default, else 'stay'.
   const resolveDoubleBack = (modal) =>
     modal?.options?.onDoubleBack ||
     getModalConfig?.().onDoubleBack ||
-    "ignore";
+    "stay";
 
   // Re-push a DEEP cushion of same-URL entries. An SPA router (e.g. vue-router)
   // can consume several of our entries when it processes the Back's popstate;
