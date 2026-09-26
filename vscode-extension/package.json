@@ -1,0 +1,35 @@
+{
+  "name": "modal-x-navigator",
+  "displayName": "Modal-X Navigator",
+  "description": "Go to a modal's .vue source file from openModal('Name') or MODALS.Name — works in plain-JS projects and inside .vue files.",
+  "version": "0.1.0",
+  "publisher": "customizer",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "vue",
+    "modal",
+    "modal-x",
+    "go to definition",
+    "navigation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JulesWinnfield22/modal-x.git"
+  },
+  "activationEvents": [
+    "onLanguage:vue",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./extension.js",
+  "contributes": {}
+}

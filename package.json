@@ -33,7 +33,8 @@
     "store/**/*.js",
     "plugins/**/*.js",
     "guards/**/*.js",
-    "router/**/*.{js,d.ts}"
+    "router/**/*.{js,d.ts}",
+    "ts-plugin/**/*.{cjs,json}"
   ],
   "scripts": {
     "dev": "vite",

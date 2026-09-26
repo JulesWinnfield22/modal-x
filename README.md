@@ -145,6 +145,83 @@ async function editUser() {
 
 ---
 
+## 🧭 Jump to Modal Source (Go to Definition)
+
+Ever wanted to **Ctrl+Click a modal name and land right in its `.vue` file**? A bare
+string like `openModal('UserForm')` normally has nowhere to jump to. Modal-X ships an
+optional **TypeScript Language Service Plugin** that makes the name itself navigable.
+
+```typescript
+openModal('UserForm', { ... })
+//         ▲ Ctrl+Click / F12  →  src/modals/UserForm.mdl.vue
+```
+
+It reads a `modalx.sources.json` name→file map that the Vite plugin generates for you
+(alongside `FileNameEnums.ts`), so it always matches your real files. It runs **inside your
+editor only** — it is never imported by your app and adds **zero bytes** to your production
+bundle.
+
+### Setup
+
+1. Make sure the [Vite plugin](#2-configure-vite-optional-but-recommended) is enabled (it
+   generates the `modalx.sources.json` map on dev-server start).
+
+2. Register the plugin in your **`tsconfig.json`**:
+
+   ```jsonc
+   {
+     "compilerOptions": {
+       "plugins": [{ "name": "@customizer/modal-x/ts-plugin" }]
+     }
+   }
+   ```
+
+3. **Tell VSCode to use your workspace TypeScript.** VSCode's *built-in* TypeScript ignores
+   `tsconfig` plugins, so this one-time step is required:
+
+   - Open any `.ts`/`.vue` file, then run **“TypeScript: Select TypeScript Version”** from the
+     Command Palette and choose **“Use Workspace Version.”**
+   - (Requires `typescript` in your project's dev dependencies, which Vue/TS projects already have.)
+
+That's it — Ctrl+Click / F12 / “Go to Definition” on any modal name passed to `openModal(...)`
+now opens the corresponding `.mdl.vue` file.
+
+> [!NOTE]
+> - This complements the existing `MODALS` constant: `MODALS.UserForm` still navigates to the
+>   generated registry, while the **string form** now jumps straight to the `.vue`.
+> - The plugin runs in any editor that uses `tsserver` (VSCode, JetBrains, Neovim), not just VSCode.
+> - Inside `.vue <script setup>` blocks, navigation is served by the Vue language server (Volar).
+>   Behavior there depends on your Volar version; navigation from plain `.ts`/`.js` files always works.
+
+### Plain-JavaScript projects & `.vue` call sites → use the VSCode extension
+
+The language-service plugin above needs a real TypeScript setup (a `tsconfig`, `typescript`
+installed, "Use Workspace Version"). If your project is **plain JavaScript**, or your
+`openModal(...)` calls live **inside `.vue` files**, use the **Modal-X Navigator** VSCode
+extension instead — it needs none of that:
+
+- Works in pure-JS projects and directly inside `.vue` files.
+- Reads the same generated `modalx.sources.json` map.
+- Ctrl+Click / F12 on a modal name (`openModal('X')` or `MODALS.X`) opens its `.vue` file.
+
+> [!IMPORTANT]
+> **Not on the VS Code Marketplace yet.** Until it's published, install it from the bundled
+> `.vsix` file:
+>
+> 1. Download [`vscode-extension/modal-x-navigator-0.1.0.vsix`](vscode-extension/modal-x-navigator-0.1.0.vsix).
+> 2. Install it — either:
+>    - **VSCode UI:** Extensions panel → `···` menu → **Install from VSIX…** → pick the file, or
+>    - **Terminal:** `code --install-extension modal-x-navigator-0.1.0.vsix`
+> 3. **Reload the window** (Command Palette → *Developer: Reload Window*).
+>
+> Then Ctrl+Click / F12 any modal name. Requires the Vite plugin to have run once so
+> `modalx.sources.json` exists.
+
+For local development of the extension itself, open [`vscode-extension/`](vscode-extension/) and
+press **F5**. The extension and the language-service plugin can coexist; both read the same map.
+
+---
+
 ## 📖 Usage
 
 ### Opening a Modal
