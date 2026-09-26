@@ -13,7 +13,7 @@
 // only if it resolves truthy do we navigate for real (bypass flag) to drop the
 // `?_mx` entry and close the modal.
 
-import { dlog } from "./modal.js";
+import { dlog, getModalConfig } from "./modal.js";
 
 let installed = false;
 let bypass = false;      // set when WE trigger a navigation that should pass through
@@ -29,6 +29,11 @@ export function installRouterHistory(router, api) {
   if (installed || !router) return;
   installed = true;
   const { modals, closeModal } = api;
+
+  // 2nd-Back policy while the confirmation is showing (per-modal option wins,
+  // else the library default, else 'stay').
+  const resolveDoubleBack = (modal) =>
+    modal?.options?.onDoubleBack || getModalConfig().onDoubleBack || "stay";
 
   router.beforeEach((to) => {
     if (bypass) {
@@ -48,14 +53,26 @@ export function installRouterHistory(router, api) {
     dlog("beforeEach: closing routed modal via nav", routed.modalToOpen, "confirming=", confirming);
 
     // A confirmation is already on screen (2nd Back, or it was opened by a
-    // button/X close that we've routed here) → "close both": resolve the
-    // confirmation as proceed; its resolution cascades the modal close and, for
-    // the pending-guard case, drives the real navigation. Block this raw nav.
+    // button/X close routed here). Apply the double-back policy (default 'stay'
+    // = behave like a normal modal: the Back dismisses only the confirmation and
+    // the edited modal stays open). Always block the raw navigation.
     const confirmShowing = modals[0]?.options?.guardConfirm;
     if (confirming || confirmShowing) {
-      dlog("  back while confirm showing -> proceed (close both)");
-      closeModal(true, true, { fromRoute: true }); // close the confirmation as proceed
-      confirming = false;
+      const policy = resolveDoubleBack(routed);
+      dlog("  back while confirm showing, policy=", policy);
+      if (policy === "close") {
+        // Proceed: resolve the confirmation → the pending guard closes the modal
+        // and its `.then` performs the real navigation (drops ?_mx).
+        closeModal(true, true, { fromRoute: true });
+        confirming = false;
+      } else if (policy === "ignore") {
+        // Absorb: keep the confirmation open; leave `confirming` set so further
+        // Backs are absorbed too. The user resolves it with its buttons.
+      } else {
+        // 'stay' (default): cancel the confirmation → the edited modal stays open.
+        closeModal(false, true, { fromRoute: true });
+        confirming = false;
+      }
       return false;
     }
 

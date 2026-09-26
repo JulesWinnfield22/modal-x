@@ -208,7 +208,7 @@ Promise API):
 | `closeOnOverlayClick` | `boolean`                         | `true`  | Closes the modal when the backdrop is clicked.                             |
 | `closeonEsc`          | `boolean`                         | `true`  | Closes the modal when the `Esc` key is pressed.                            |
 | `skipHistory`         | `boolean`                         | `false` | Opt out of the browser-history integration (for transient confirmations/spinners). |
-| `onDoubleBack`        | `'ignore' \| 'stay' \| 'close'`   | plugin default | Popstate-mode 2nd-Back policy for this modal (see [Browser Back](#-browser-back--history-integration-v04)). |
+| `onDoubleBack`        | `'ignore' \| 'stay' \| 'close'`   | plugin default | 2nd-Back-while-confirming policy for this modal (see [Browser Back](#-browser-back--history-integration-v04)). |
 
 ### Closing a Modal
 
@@ -266,24 +266,34 @@ a genuine vue-router navigation intercepted by a global `beforeEach` guard:
 - **Back on a plain (unguarded) modal** → the modal closes, `?_mx` is removed.
 - **Back on a guarded modal with unsaved changes** → navigation is blocked and your
   confirmation is shown; the URL stays at `?_mx`.
-- **Confirm** (or press **Back again** while the confirmation is showing) → both the
-  confirmation and the modal close, and `?_mx` is removed.
+- **Back again while the confirmation is showing** → with the default
+  `onDoubleBack: 'stay'`, the Back **dismisses only the confirmation** and the edited
+  modal stays open — it behaves like a normal modal. (A subsequent Back re-shows the
+  confirmation.) Set `onDoubleBack: 'close'` if you instead want the 2nd Back to close
+  both, or `'ignore'` to make Back do nothing until a button is pressed.
+- **Confirm / Proceed button** → the modal closes and `?_mx` is removed.
 - **Cancel** → the confirmation closes and the modal stays open.
 - The modal's **X / ESC / overlay** close of a guarded modal is routed through the
   same guard, so button-close and Back behave identically.
+
+Router mode honors the same **`onDoubleBack`** policy as the popstate fallback
+(see the table below); it defaults to `'stay'`.
 
 ### Popstate fallback (no vue-router)
 
 Each non-transient modal pushes a few hidden, **same-URL** history entries when it
 opens (the URL bar never changes). Back is handled with a "let it pop, re-arm a
-buffer, run the guard" technique. What a second Back does while the confirmation is
-showing is configurable per the **`onDoubleBack`** option:
+buffer, run the guard" technique.
+
+### `onDoubleBack` — what a 2nd Back does while the confirmation is showing
+
+This policy applies to **both modes** (default `'stay'`):
 
 | `onDoubleBack` | 2nd Back while confirmation is showing |
 | :--- | :--- |
-| `'ignore'` _(default)_ | Ignored — the confirmation stays open; resolve it with its buttons |
-| `'stay'` | Closes only the confirmation; the edited modal stays open |
+| `'stay'` _(default)_ | Dismisses only the confirmation; the edited modal stays open (normal-modal feel). A later Back re-shows it. |
 | `'close'` | Closes the confirmation **and** the edited modal |
+| `'ignore'` | Does nothing — the confirmation stays open; resolve it with its buttons |
 
 ### Intercepting a close — `onBeforeModalClose`
 
@@ -406,7 +416,7 @@ inside a modal — it detects the context and guards the right thing.
 | `enabled` | `() => boolean` | Return `false` to disable the guard entirely. |
 | `isSubmitting` | `() => boolean` | Return `true` to skip the guard while a submit is in flight. |
 | `beforeUnload` | `boolean` | Also guard tab-close / refresh via the native `beforeunload` prompt (default `true`). |
-| `onDoubleBack` | `'ignore' \| 'stay' \| 'close'` | Popstate-mode double-back policy for this modal (overrides the plugin default). |
+| `onDoubleBack` | `'ignore' \| 'stay' \| 'close'` | Double-back policy for this modal (both modes; overrides the plugin default). |
 
 Every guard returns `{ isDirty, markPristine }` — call **`markPristine()`** after a
 successful save (or once async data finishes loading) to reset the "dirty" baseline.
@@ -432,7 +442,7 @@ Pass library-wide options as the second argument to `app.use`:
 ```javascript
 app.use(modal, {
   router,                 // your vue-router instance → enables router mode
-  onDoubleBack: "ignore", // popstate-mode 2nd-Back policy (default 'ignore')
+  onDoubleBack: "stay",   // 2nd-Back-while-confirming policy (default 'stay')
   backCushion: 6,         // popstate-mode: same-URL entries pushed per modal
   debugHistory: false,    // log history/Back decisions to the console
 });
@@ -441,7 +451,7 @@ app.use(modal, {
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `router` | vue-router `Router` | `undefined` | Enables **router mode**. Omit for the popstate fallback. |
-| `onDoubleBack` | `'ignore' \| 'stay' \| 'close'` | `'ignore'` | Popstate-mode 2nd-Back behavior (see the table above). Router mode always closes both. |
+| `onDoubleBack` | `'ignore' \| 'stay' \| 'close'` | `'stay'` | What a 2nd Back does while a close-confirmation is showing (see the table above). Applies to **both** router and popstate modes. |
 | `backCushion` | `number` | `6` | Popstate-mode only: how many same-URL history entries each modal pushes (a deeper cushion survives rapid Back double-clicks). |
 | `debugHistory` | `boolean` | `false` | Log every history/Back decision to the console (`[modalx]`). |
 
@@ -568,7 +578,7 @@ Read or update the library-wide config at runtime (same keys as the plugin optio
 import { setModalConfig, getModalConfig } from "@customizer/modal-x";
 
 setModalConfig({ debugHistory: true });     // turn history tracing on at runtime
-getModalConfig().onDoubleBack;              // → 'ignore'
+getModalConfig().onDoubleBack;              // → 'stay'
 ```
 
 ### `useCloseGuard(opts) → { isDirty, markPristine }`

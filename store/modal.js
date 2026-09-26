@@ -42,7 +42,7 @@ if (!globalThis[STORE_KEY]) {
     //   real (query-param) route change and the browser Back is handled through
     //   vue-router's own navigation guards — reliable in apps where fighting
     //   popstate directly is flaky. Without it, the same-URL popstate scheme runs.
-    config: { onDoubleBack: "ignore", backCushion: 6, debugHistory: false, router: null },
+    config: { onDoubleBack: "stay", backCushion: 6, debugHistory: false, router: null },
   };
 }
 

@@ -23,7 +23,7 @@ export interface GuardOptions {
   isSubmitting?: () => boolean;
   /** Also guard tab close / refresh via `beforeunload` (default true). */
   beforeUnload?: boolean;
-  /** Double-back policy when guarding a modal close (default 'ignore'). */
+  /** Double-back policy when guarding a modal close (default 'stay'). */
   onDoubleBack?: "ignore" | "stay" | "close";
 }
 

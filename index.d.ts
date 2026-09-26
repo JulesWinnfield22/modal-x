@@ -8,9 +8,10 @@ export interface ModalOptions {
   skipHistory?: boolean;
   /**
    * What a browser Back does while this modal's close-confirmation is showing.
-   * `'ignore'` (default) absorbs Back and keeps the confirmation open (resolve
-   * via its buttons); `'stay'` closes only the confirmation and keeps this modal
-   * open; `'close'` closes both. Overrides the library-wide default.
+   * `'stay'` (default) dismisses only the confirmation and keeps this modal open
+   * (normal-modal feel; a later Back re-shows it); `'close'` closes both;
+   * `'ignore'` keeps the confirmation open until a button is pressed. Overrides
+   * the library-wide default. Applies to both router and popstate modes.
    */
   onDoubleBack?: "ignore" | "stay" | "close";
   [key: string]: any;
@@ -27,10 +28,10 @@ export interface ModalPluginOptions {
    */
   router?: any;
   /**
-   * Popstate-fallback double-back policy default for all modals: `'ignore'`
-   * (default — keep the confirmation open, resolve via its buttons), `'stay'`
-   * (2nd Back closes only the confirmation), `'close'` (2nd Back closes both).
-   * In router mode the 2nd Back always closes both.
+   * Library-wide default for what a 2nd Back does while a close-confirmation is
+   * showing (applies to both router and popstate modes): `'stay'` (default —
+   * dismiss only the confirmation, keep the modal open), `'close'` (close both),
+   * `'ignore'` (keep the confirmation open until a button is pressed).
    */
   onDoubleBack?: "ignore" | "stay" | "close";
   /** Popstate fallback: same-URL history entries each non-transient modal pushes (default 6). */
@@ -154,7 +155,7 @@ export interface CloseGuardOptions {
   enabled?: () => boolean;
   isSubmitting?: () => boolean;
   beforeUnload?: boolean;
-  /** Double-back policy for this modal (default 'ignore'). */
+  /** Double-back policy for this modal (default 'stay'). */
   onDoubleBack?: "ignore" | "stay" | "close";
 }
 
