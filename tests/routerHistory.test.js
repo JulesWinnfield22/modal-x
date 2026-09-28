@@ -179,6 +179,110 @@ describe("router mode: a closed modal leaves no ?_mx entry behind", () => {
   });
 });
 
+describe("router mode: a guarded modal closed by a button", () => {
+  // Opens a guarded modal and returns its result promise. `guard` stands in for
+  // useCloseGuard; by default it always asks (a dirty form).
+  function openWith(name, guard, options) {
+    const result = api.openModal(name, null, undefined, options);
+    const confirm = api.makeConfirm({ confirmInHistory: true });
+    api.onBeforeModalClose(() => (guard ? guard(confirm) : confirm()));
+    return result;
+  }
+
+  it("resolves the opener with the response when the guard allows", async () => {
+    await onPageWithHistory();
+    const result = openWith("Edit", () => true);
+    await flush();
+
+    api.closeModal({ amount: 5 }); // e.g. a submit handler closing with its result
+    await flush();
+    expect(await result).toEqual({ amount: 5 });
+    expect(names()).toEqual([]);
+    expect(current()).toBe("/");
+
+    router.back();
+    await flush();
+    expect(current()).toBe("/start");
+  });
+
+  it("runs the guard when closeModal is called, not after", async () => {
+    await onPageWithHistory();
+    let submitting = true; // a form's isSubmitting, true only inside its handler
+    const result = openWith("Edit", (confirm) => (submitting ? true : confirm()));
+    await flush();
+
+    api.closeModal(true);
+    submitting = false; // the submit handler returns right after closing
+    await flush();
+    expect(names()).toEqual([]); // no "discard changes?" after a successful submit
+    expect(await result).toBe(true);
+  });
+
+  it("X on a dirty modal → Confirm resolves with the close's response", async () => {
+    await onPageWithHistory();
+    const result = openWith("Edit");
+    await flush();
+
+    api.closeModal("closed-by-x");
+    await flush();
+    expect(names()).toEqual(["ConfirmationModal", "Edit"]);
+
+    api.closeModal(true); // Confirm
+    await flush();
+    expect(names()).toEqual([]);
+    expect(await result).toBe("closed-by-x");
+    expect(current()).toBe("/");
+
+    router.back();
+    await flush();
+    expect(current()).toBe("/start");
+  });
+
+  it("X on a dirty modal → Cancel keeps the modal and its ?_mx entry", async () => {
+    await onPageWithHistory();
+    openWith("Edit");
+    await flush();
+
+    api.closeModal();
+    await flush();
+    api.closeModal(false); // Cancel
+    await flush();
+    expect(names()).toEqual(["Edit"]);
+    expect(router.currentRoute.value.query._mx).toBeTruthy();
+  });
+
+  it("X → Back while asking, with 'stay', dismisses only the confirmation", async () => {
+    await onPageWithHistory();
+    openWith("Edit", undefined, { onDoubleBack: "stay" });
+    await flush();
+
+    api.closeModal();
+    await flush();
+    router.back();
+    await flush();
+    expect(names()).toEqual(["Edit"]);
+    expect(router.currentRoute.value.query._mx).toBeTruthy();
+  });
+
+  it("X → Back while asking, with 'close', closes both and leaves no ?_mx entry", async () => {
+    await onPageWithHistory();
+    const result = openWith("Edit", undefined, { onDoubleBack: "close" });
+    await flush();
+
+    api.closeModal("closed-by-x");
+    await flush();
+    router.back();
+    await flush();
+    expect(names()).toEqual([]);
+    expect(await result).toBe("closed-by-x");
+    expect(current()).toBe("/");
+
+    router.back();
+    await flush();
+    expect(current()).toBe("/start");
+  });
+});
+
 describe("route-leave guard (useLeaveGuard)", () => {
   it("Back → Confirm leaves; the next Back goes further back, not to the form", async () => {
     await router.push("/");

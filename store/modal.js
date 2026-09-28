@@ -160,22 +160,14 @@ async function closeModal(response, sendResponse = true, opts = {}) {
   if (!modal) return false;
   if (modal._closing) return false;      // guard against re-entrant close
 
-  // ROUTER MODE: a GUARDED routed modal being closed by a button/X/ESC/overlay
-  // (not via the router guard, not forced) is routed THROUGH vue-router so the
-  // browser Back and the button close share one path (the beforeEach guard runs
-  // the confirmation). Prevents a stale confirmation-close from "unrouting" it.
-  if (!fromRoute && !force && modal._mxRouted && typeof modal.beforeClose === "function") {
-    const router = getModalConfig().router;
-    if (router) {
-      dlog("closeModal: delegating guarded routed close to router.back()");
-      router.back(); // → beforeEach runs the guard uniformly
-      return false;
-    }
-  }
-
   modal._closing = true;
 
-  // beforeClose lifecycle hook — lets a modal veto or defer its own close.
+  // beforeClose lifecycle hook — lets a modal veto or defer its own close. It
+  // runs NOW, in every mode: a button/X close of a routed modal is not deferred
+  // to the router guard, which would run it only after the caller's state moved
+  // on (a form's isSubmitting already false) and close with `undefined`,
+  // dropping `response`. A Back while its confirmation shows is handled by the
+  // router guard (see routerHistory.js).
   if (!force && typeof modal.beforeClose === "function") {
     let allow;
     try {
@@ -209,8 +201,9 @@ async function closeModal(response, sendResponse = true, opts = {}) {
   // History cleanup.
   if (modal._mxRouted) {
     // ROUTER MODE: drop this modal's `?_mx` route entry — unless the router guard
-    // is already navigating (fromRoute), in which case it owns the navigation.
-    if (!fromRoute) {
+    // is already navigating (fromRoute, or a Back it let through while this
+    // close was asking: _routeDropped), in which case it owns the navigation.
+    if (!fromRoute && !modal._routeDropped) {
       const router = getModalConfig().router;
       if (router) {
         dlog("closeModal cleanup (router): back() to drop ?_mx");

@@ -350,8 +350,10 @@ a genuine vue-router navigation intercepted by a global `beforeEach` guard:
   both, or `'ignore'` to make Back do nothing until a button is pressed.
 - **Confirm / Proceed button** → the modal closes and `?_mx` is removed.
 - **Cancel** → the confirmation closes and the modal stays open.
-- The modal's **X / ESC / overlay** close of a guarded modal is routed through the
-  same guard, so button-close and Back behave identically.
+- The modal's **X / ESC / overlay** or a programmatic `closeModal(response)` runs the
+  guard right away and, once it allows, closes the modal, resolves `openModal` with
+  `response` and removes `?_mx`. A Back while that confirmation is showing follows
+  the same `onDoubleBack` policy.
 
 Router mode honors the same **`onDoubleBack`** policy as the popstate fallback
 (see the table below); it defaults to `'stay'`.

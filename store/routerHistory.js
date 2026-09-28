@@ -71,7 +71,7 @@ export function installRouterHistory(router, api) {
     dlog("beforeEach: closing routed modal via nav", routed.modalToOpen, "confirming=", confirming);
 
     // A confirmation is already on screen (2nd Back, or it was opened by a
-    // button/X close routed here). Apply the double-back policy (default 'stay'
+    // button/X close in closeModal). Apply the double-back policy (default 'stay'
     // = behave like a normal modal: the Back dismisses only the confirmation and
     // the edited modal stays open). Always block the raw navigation.
     const confirmShowing = modals[0]?.options?.guardConfirm;
@@ -79,10 +79,15 @@ export function installRouterHistory(router, api) {
       const policy = resolveDoubleBack(routed);
       dlog("  back while confirm showing, policy=", policy);
       if (policy === "close") {
-        // Proceed: resolve the confirmation → the pending guard closes the modal
-        // and its `.then` performs the real navigation (drops ?_mx).
+        // Proceed: resolve the confirmation → the pending guard closes the modal.
+        // A Back-started close drops ?_mx in its `.then` below; a button/X close
+        // (pending inside closeModal) leaves that to us, as its own cleanup
+        // would race this blocked Back's revert.
+        const buttonClose = !confirming && routed._closing;
+        if (buttonClose) routed._routeDropped = true;
         closeModal(true, true, { fromRoute: true });
         confirming = false;
+        if (buttonClose) leaveEntry(routed, to);
       } else if (policy === "ignore") {
         // Absorb: keep the confirmation open; leave `confirming` set so further
         // Backs are absorbed too. The user resolves it with its buttons.
@@ -101,25 +106,33 @@ export function installRouterHistory(router, api) {
       confirming = false;
       dlog("  guard resolved closed=", closed);
       if (!closed) return; // vetoed (Cancel) → stay; navigation was already blocked.
-
-      // Re-navigate from this modal's `?_mx` entry, once the blocked Back's
-      // revert has landed back on it.
-      whenOnEntry(router, (loc) => loc.query._mx === routed._mxId, () => {
-        bypass = true;
-        if (to.fullPath === routed._mxFrom) {
-          // Back to the page below: pop the `?_mx` entry. Pushing the page anew
-          // would leave `?_mx` behind, reachable by the next Back.
-          dlog("  -> router.back() to drop ?_mx");
-          router.back();
-        } else {
-          // Navigating elsewhere: the destination replaces the `?_mx` entry.
-          dlog("  -> router.replace", to.fullPath);
-          router.replace(to.fullPath);
-        }
-      });
+      leaveEntry(routed, to);
     });
     return false;
   });
+
+  // Re-navigate from a closed modal's `?_mx` entry to `to`, once the blocked
+  // Back's revert has landed back on it.
+  function leaveEntry(routed, to) {
+    whenOnEntry(router, (loc) => loc.query._mx === routed._mxId, () => {
+      if (modals.includes(routed)) {
+        // Still open (its guard hasn't finished): its own cleanup drops ?_mx.
+        routed._routeDropped = false;
+        return;
+      }
+      bypass = true;
+      if (to.fullPath === routed._mxFrom) {
+        // Back to the page below: pop the `?_mx` entry. Pushing the page anew
+        // would leave `?_mx` behind, reachable by the next Back.
+        dlog("  -> router.back() to drop ?_mx");
+        router.back();
+      } else {
+        // Navigating elsewhere: the destination replaces the `?_mx` entry.
+        dlog("  -> router.replace", to.fullPath);
+        router.replace(to.fullPath);
+      }
+    });
+  }
 
   dlog("router history installed");
 }
