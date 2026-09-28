@@ -105,7 +105,7 @@ export function makeConfirm(opts) {
     // that would close it is handled by the router guard, not the confirm's own
     // entry. Only the popstate-mode close guard gives the confirm its own entry.
     const modalOpts = opts.confirmInHistory && !getModalConfig().router
-      ? { historyDepth: 1, guardConfirm: true }
+      ? { guardConfirm: true }
       : { skipHistory: true, guardConfirm: true }; // guardConfirm marks the transient confirm
     dlog("guard: opening built-in confirm", opts.modal || "ConfirmationModal", modalOpts);
     const res = await openModal(

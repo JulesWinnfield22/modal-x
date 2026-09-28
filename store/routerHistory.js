@@ -25,6 +25,24 @@ export function setRouterBypass() {
   bypass = true;
 }
 
+/**
+ * Run `action` once the browser's history pointer is on the entry matching
+ * `isOnEntry(resolvedLocation)` — right away if it already is, else on the
+ * popstate that lands there. A guard that blocks a Back makes vue-router revert
+ * it asynchronously; a history move made before that revert lands is applied
+ * from the wrong entry (and overshoots).
+ */
+export function whenOnEntry(router, isOnEntry, action) {
+  const onEntry = () => isOnEntry(router.resolve(router.options.history.location));
+  if (onEntry()) return action();
+  const onPop = () => {
+    if (!onEntry()) return;
+    window.removeEventListener("popstate", onPop);
+    action();
+  };
+  window.addEventListener("popstate", onPop);
+}
+
 export function installRouterHistory(router, api) {
   if (installed || !router) return;
   installed = true;
@@ -82,11 +100,23 @@ export function installRouterHistory(router, api) {
     closeModal(undefined, true, { fromRoute: true }).then((closed) => {
       confirming = false;
       dlog("  guard resolved closed=", closed);
-      if (closed) {
+      if (!closed) return; // vetoed (Cancel) → stay; navigation was already blocked.
+
+      // Re-navigate from this modal's `?_mx` entry, once the blocked Back's
+      // revert has landed back on it.
+      whenOnEntry(router, (loc) => loc.query._mx === routed._mxId, () => {
         bypass = true;
-        router.push(to.fullPath); // real navigation → drops ?_mx, modal already removed
-      }
-      // else vetoed (Cancel) → stay; navigation was already blocked.
+        if (to.fullPath === routed._mxFrom) {
+          // Back to the page below: pop the `?_mx` entry. Pushing the page anew
+          // would leave `?_mx` behind, reachable by the next Back.
+          dlog("  -> router.back() to drop ?_mx");
+          router.back();
+        } else {
+          // Navigating elsewhere: the destination replaces the `?_mx` entry.
+          dlog("  -> router.replace", to.fullPath);
+          router.replace(to.fullPath);
+        }
+      });
     });
     return false;
   });

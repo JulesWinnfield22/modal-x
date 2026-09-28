@@ -358,9 +358,11 @@ Router mode honors the same **`onDoubleBack`** policy as the popstate fallback
 
 ### Popstate fallback (no vue-router)
 
-Each non-transient modal pushes a few hidden, **same-URL** history entries when it
-opens (the URL bar never changes). Back is handled with a "let it pop, re-arm a
-buffer, run the guard" technique.
+Each non-transient modal pushes exactly **one** hidden, **same-URL** history entry
+when it opens (the URL bar never changes) and removes it when it closes. A Back
+consumes the top modal's entry and runs its guard; if the modal stays open (the
+close was cancelled), its entry is restored. Once a modal is closed, no history of
+it remains — the next Back goes to the real previous page.
 
 ### `onDoubleBack` — what a 2nd Back does while the confirmation is showing
 
@@ -520,7 +522,6 @@ Pass library-wide options as the second argument to `app.use`:
 app.use(modal, {
   router,                 // your vue-router instance → enables router mode
   onDoubleBack: "stay",   // 2nd-Back-while-confirming policy (default 'stay')
-  backCushion: 6,         // popstate-mode: same-URL entries pushed per modal
   debugHistory: false,    // log history/Back decisions to the console
 });
 ```
@@ -529,8 +530,8 @@ app.use(modal, {
 | :--- | :--- | :--- | :--- |
 | `router` | vue-router `Router` | `undefined` | Enables **router mode**. Omit for the popstate fallback. |
 | `onDoubleBack` | `'ignore' \| 'stay' \| 'close'` | `'stay'` | What a 2nd Back does while a close-confirmation is showing (see the table above). Applies to **both** router and popstate modes. |
-| `backCushion` | `number` | `6` | Popstate-mode only: how many same-URL history entries each modal pushes (a deeper cushion survives rapid Back double-clicks). |
 | `debugHistory` | `boolean` | `false` | Log every history/Back decision to the console (`[modalx]`). |
+| `backCushion` | `number` | — | **Deprecated, ignored.** Each modal owns exactly one history entry, removed when it closes. |
 
 These are defaults; `onDoubleBack` can be overridden per modal via
 `openModal(name, data, cb, { onDoubleBack: 'close' })` or via a guard's

@@ -34,7 +34,10 @@ export interface ModalPluginOptions {
    * `'ignore'` (keep the confirmation open until a button is pressed).
    */
   onDoubleBack?: "ignore" | "stay" | "close";
-  /** Popstate fallback: same-URL history entries each non-transient modal pushes (default 6). */
+  /**
+   * @deprecated Ignored. Each modal now owns exactly one history entry, removed
+   * when it closes, so no Back after a close lands on leftover modal history.
+   */
   backCushion?: number;
   /** Log every history/Back decision to the console ("[modalx]"). Default false. */
   debugHistory?: boolean;

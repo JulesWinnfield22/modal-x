@@ -28,21 +28,18 @@ if (!globalThis[STORE_KEY]) {
     // and overridable per modal via openModal(..., options).
     //   onDoubleBack: what a browser Back does while a modal's own close
     //   confirmation is showing —
-    //     'ignore' (default): absorb Back, keep the confirmation open; the user
-    //                resolves it via its Cancel/Confirm buttons. Most robust.
-    //     'stay':   the Back closes only the confirmation; the edited modal stays.
+    //     'stay' (default): the Back closes only the confirmation; the edited
+    //                modal stays.
     //     'close':  the Back closes the confirmation AND the edited modal.
-    //   backCushion: how many same-URL history entries each non-transient modal
-    //   pushes. A cushion >1 keeps a rapid *double-click* of the browser Back
-    //   button (two history traversals the browser batches before our popstate
-    //   handler can re-arm) from overshooting past the app and unloading it.
+    //     'ignore': absorb Back, keep the confirmation open; the user resolves it
+    //                via its Cancel/Confirm buttons.
     //   debugHistory: when true, logs every history/back decision to the console
     //   (prefixed "[modalx]") for diagnosing browser Back behavior. Off by default.
     //   router: (optional) a vue-router instance. When provided, modal-open is a
     //   real (query-param) route change and the browser Back is handled through
     //   vue-router's own navigation guards — reliable in apps where fighting
     //   popstate directly is flaky. Without it, the same-URL popstate scheme runs.
-    config: { onDoubleBack: "stay", backCushion: 6, debugHistory: false, router: null },
+    config: { onDoubleBack: "stay", debugHistory: false, router: null },
   };
 }
 
@@ -122,17 +119,17 @@ function openModal(modalToOpen, data, cb, options) {
       const cur = router.currentRoute.value;
       item._mxRouted = true;
       item._mxId = item.id;
+      // The entry directly below `?_mx` — a Back to it closes this modal, and
+      // routerHistory pops back onto it (instead of pushing it anew).
+      item._mxFrom = cur.fullPath;
       router.push({ query: { ...cur.query, _mx: item.id } });
       dlog("openModal", modalToOpen, "(router) query._mx=", item.id);
     } else if (typeof window !== "undefined" && !options?.skipHistory) {
-      // POPSTATE FALLBACK (no router): same-URL cushion scheme.
-      const depth = Math.max(1, options?.historyDepth ?? getModalConfig().backCushion ?? 1);
-      for (let i = 0; i < depth; i++) {
-        window.history.pushState(window.history.state, "");
-      }
+      // POPSTATE FALLBACK (no router): each modal owns exactly ONE same-URL
+      // entry, and closing it removes exactly one — nothing is left behind.
+      window.history.pushState(window.history.state, "");
       item._historyPushed = true;
-      item._historyDepth = depth;
-      dlog("openModal", modalToOpen, "pushed cushion", depth, "-> len", window.history.length);
+      dlog("openModal", modalToOpen, "pushed entry -> len", window.history.length);
     } else {
       dlog("openModal", modalToOpen, options?.skipHistory ? "(skipHistory)" : "(no window)");
     }
@@ -222,12 +219,11 @@ async function closeModal(response, sendResponse = true, opts = {}) {
       }
     }
   } else if (modal._historyPushed && !fromPopstate && typeof window !== "undefined") {
-    // POPSTATE FALLBACK: pop our same-URL entries. `history.go(-n)` fires a single
-    // popstate, so one markIgnoredPop.
-    const depth = modal._historyDepth || 1;
-    dlog("closeModal cleanup: go(-", depth, ") len", window.history.length);
+    // POPSTATE FALLBACK: pop this modal's single same-URL entry. (When the
+    // browser Back closed it — fromPopstate — the Back already consumed it.)
+    dlog("closeModal cleanup: go(-1) len", window.history.length);
     markIgnoredPop();
-    window.history.go(-depth);
+    window.history.go(-1);
   }
 
   dlog("closeModal done", modal.modalToOpen, "remaining stack=", modals.map((m) => m.modalToOpen));
