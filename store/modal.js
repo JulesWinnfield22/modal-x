@@ -43,6 +43,17 @@ if (!globalThis[STORE_KEY]) {
   };
 }
 
+/**
+ * Named state kept on the shared store rather than in module variables, so it
+ * survives the library being loaded twice (see STORE_KEY above) — e.g. Vite dev
+ * serving app imports a pre-bundled copy while Modal.vue loads the raw files.
+ */
+export function sharedState(name, init) {
+  const store = globalThis[STORE_KEY];
+  if (!store[name]) store[name] = init();
+  return store[name];
+}
+
 /** Console tracer, active only when config.debugHistory is on. */
 export function dlog(...args) {
   if (globalThis[STORE_KEY]?.config?.debugHistory) {

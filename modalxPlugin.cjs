@@ -125,6 +125,14 @@ function modalTypesPlugin(options = {}) {
   return {
     name: "modalx-types",
     apply: "serve",
+    // Serve modal-x as source in dev. Pre-bundled by Vite's dep optimizer, it
+    // would be loaded twice (the bundle for app imports, raw files for its .vue
+    // parts) and its import.meta.glob modal scan would be left untransformed.
+    config() {
+      return {
+        optimizeDeps: { exclude: ["@customizer/modal-x", "@customizer/modal-x/router"] },
+      };
+    },
     configResolved(config) {
       rootPath = path.resolve(config.root); // MUST be absolute
       outFile = resolveOutFile(rootPath);

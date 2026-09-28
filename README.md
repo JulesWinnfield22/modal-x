@@ -77,6 +77,19 @@ export default defineConfig({
 });
 ```
 
+The plugin also keeps modal-x out of Vite's dependency pre-bundling. modal-x ships
+as source and scans your project for modals with `import.meta.glob`; if Vite
+pre-bundles it, dev loads the library twice and that scan isn't transformed.
+**Not using the plugin?** Exclude it yourself:
+
+```javascript
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ["@customizer/modal-x", "@customizer/modal-x/router"],
+  },
+});
+```
+
 ---
 
 ## 🛡️ Type Safety
