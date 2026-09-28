@@ -1,6 +1,6 @@
 {
   "name": "@customizer/modal-x",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": false,
   "description": "Lightweight, file-based modal system for Vue 3 with automatic type-safety, Promise-based API, and zero boilerplate. Distributed as source files to allow Vite to perform global file scanning and perfect code-splitting in your project.",
   "keywords": [
